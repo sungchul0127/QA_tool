@@ -9,9 +9,26 @@
 <body>
   <header class="site-header">
     <h1>QA 툴</h1>
+    <button type="button" id="logout-button" hidden>로그아웃</button>
   </header>
 
-  <main class="container">
+  <main id="login-view" class="container" hidden>
+    <section class="card">
+      <h2>로그인</h2>
+      <form id="login-form" class="login-form">
+        <label for="login-email">이메일</label>
+        <input id="login-email" type="email" autocomplete="username" required>
+        <label for="login-password">비밀번호</label>
+        <input id="login-password" type="password" autocomplete="current-password" required>
+        <div class="form-footer">
+          <p id="login-message" class="message" role="status"></p>
+          <button type="submit" class="button-primary">로그인</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <main id="app-view" class="container" hidden>
     <section class="card">
       <h2>문구 등록</h2>
       <form id="phrase-form">
@@ -26,11 +43,12 @@
 
     <section>
       <h2>등록된 문구</h2>
-      <p id="empty-message" class="empty">아직 등록된 문구가 없습니다.</p>
+      <p id="list-message" class="empty" role="status"></p>
       <ul id="phrase-list" class="phrase-list"></ul>
     </section>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.min.js" integrity="sha384-UagCvVPT5XXA0Hx+nJYUAGBFseHT9zBgpJMSebsAxl9lciTwbT+39j5VfRjdP5Tp" crossorigin="anonymous"></script>
   <script src="app.js"></script>
 </body>
 </html>

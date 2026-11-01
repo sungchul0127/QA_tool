@@ -1,6 +1,11 @@
-const STORAGE_KEY = "qa-tool.phrases";
+// 공개되어도 되는 값이다. 데이터 접근은 supabase/schema.sql의 권한 규칙으로 막는다.
+const SUPABASE_URL = "https://ljnpbdwhgenrxccinnno.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_VSwsbTaZvwRHuUv3yKIQoQ_SHZxMwkD";
+
+const LEGACY_STORAGE_KEY = "qa-tool.phrases";
 const COPY_FEEDBACK_MS = 1500;
-const SAVE_ERROR_MESSAGE = "저장하지 못했습니다. 브라우저 저장소 설정을 확인해 주세요.";
+const SAVE_ERROR_MESSAGE = "저장하지 못했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.";
+const EMPTY_LIST_MESSAGE = "아직 등록된 문구가 없습니다.";
 const DATE_CHECK_MS = 60000;
 
 const pad = (value) => String(value).padStart(2, "0");
@@ -14,30 +19,72 @@ const DATE_VARIABLES = {
 // 캡처 그룹이 있어 split 결과의 홀수 번째 항목이 변수가 된다.
 const DATE_VARIABLE_PATTERN = /(\{YYYY-MM-DD\}|\{YYYY\.MM\.DD\}|\{MM\/DD\}|\{M월 D일\})/;
 
+const client = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+const loginView = document.getElementById("login-view");
+const loginForm = document.getElementById("login-form");
+const loginEmail = document.getElementById("login-email");
+const loginPassword = document.getElementById("login-password");
+const loginMessage = document.getElementById("login-message");
+const logoutButton = document.getElementById("logout-button");
+const appView = document.getElementById("app-view");
 const form = document.getElementById("phrase-form");
 const input = document.getElementById("phrase-input");
 const formMessage = document.getElementById("form-message");
-const emptyMessage = document.getElementById("empty-message");
+const listMessage = document.getElementById("list-message");
 const list = document.getElementById("phrase-list");
 
-let phrases = loadPhrases();
 let shownDate = dateKey();
+// undefined는 아직 로그인 상태를 확인하지 못했다는 뜻이다.
+let currentUserId;
 
-function loadPhrases() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    return Array.isArray(saved) ? saved : [];
-  } catch {
-    return [];
+async function fetchPhrases() {
+  const { data, error } = await client
+    .from("phrases")
+    .select("id, text")
+    .order("created_at", { ascending: false });
+  if (error) {
+    throw error;
   }
+  return data;
 }
 
-function savePhrases(next) {
+async function insertPhrase(text) {
+  const { data, error } = await client.from("phrases").insert({ text }).select("id, text").single();
+  return error ? null : data;
+}
+
+async function updatePhrase(id, text) {
+  const { data, error } = await client
+    .from("phrases")
+    .update({ text })
+    .eq("id", id)
+    .select("id, text")
+    .single();
+  return error ? null : data;
+}
+
+// 온라인 저장 전에 이 브라우저에 저장해 둔 문구를 한 번만 옮긴다.
+async function importLegacyPhrases() {
+  let saved;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    return true;
+    saved = JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY));
   } catch {
-    return false;
+    return;
+  }
+  if (!Array.isArray(saved)) {
+    return;
+  }
+
+  // 목록이 최신순이므로 앞선 문구일수록 시간이 늦어야 순서가 유지된다.
+  const now = Date.now();
+  const rows = saved.map((phrase, index) => ({
+    text: phrase.text,
+    created_at: new Date(now - index).toISOString(),
+  }));
+  const { error } = rows.length ? await client.from("phrases").insert(rows) : { error: null };
+  if (!error) {
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
   }
 }
 
@@ -199,7 +246,7 @@ function createPhraseEditor(phrase) {
   saveButton.type = "button";
   saveButton.className = "button-primary";
   saveButton.textContent = "저장";
-  saveButton.addEventListener("click", () => {
+  saveButton.addEventListener("click", async () => {
     const text = textarea.value.trim();
     if (!text) {
       message.textContent = "문구를 입력해 주세요.";
@@ -207,14 +254,14 @@ function createPhraseEditor(phrase) {
       return;
     }
 
-    const updated = { ...phrase, text };
-    const next = phrases.map((p) => (p.id === phrase.id ? updated : p));
-    if (!savePhrases(next)) {
+    saveButton.disabled = true;
+    const updated = await updatePhrase(phrase.id, text);
+    saveButton.disabled = false;
+    if (!updated) {
       message.textContent = SAVE_ERROR_MESSAGE;
       return;
     }
 
-    phrases = next;
     editor.replaceWith(createPhraseItem(updated));
   });
 
@@ -230,12 +277,65 @@ function createPhraseEditor(phrase) {
   return editor;
 }
 
-function render() {
-  emptyMessage.hidden = phrases.length > 0;
-  list.replaceChildren(...phrases.map(createPhraseItem));
+function setListMessage(text) {
+  listMessage.textContent = text;
+  listMessage.hidden = !text;
 }
 
-form.addEventListener("submit", (event) => {
+async function showApp() {
+  loginView.hidden = true;
+  appView.hidden = false;
+  logoutButton.hidden = false;
+  list.replaceChildren();
+  setListMessage("문구를 불러오는 중입니다.");
+
+  const userId = currentUserId;
+  await importLegacyPhrases();
+  try {
+    const phrases = await fetchPhrases();
+    // 불러오는 사이에 로그아웃했다면 화면에 그리지 않는다.
+    if (userId !== currentUserId) {
+      return;
+    }
+    list.replaceChildren(...phrases.map(createPhraseItem));
+    setListMessage(phrases.length ? "" : EMPTY_LIST_MESSAGE);
+  } catch {
+    setListMessage("문구를 불러오지 못했습니다. 새로고침해 주세요.");
+  }
+}
+
+function showLogin() {
+  appView.hidden = true;
+  logoutButton.hidden = true;
+  loginView.hidden = false;
+  list.replaceChildren();
+  input.value = "";
+  formMessage.textContent = "";
+  loginPassword.value = "";
+  loginEmail.focus();
+}
+
+loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const submitButton = loginForm.querySelector("button[type=submit]");
+  submitButton.disabled = true;
+  loginMessage.textContent = "";
+  const { error } = await client.auth.signInWithPassword({
+    email: loginEmail.value.trim(),
+    password: loginPassword.value,
+  });
+  submitButton.disabled = false;
+  if (error) {
+    loginMessage.textContent = "로그인하지 못했습니다. 이메일과 비밀번호를 확인해 주세요.";
+  }
+});
+
+logoutButton.addEventListener("click", () => {
+  client.auth.signOut();
+});
+
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const text = input.value.trim();
@@ -245,23 +345,35 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
-  const phrase = { id: crypto.randomUUID(), text };
-  const next = [phrase, ...phrases];
-  if (!savePhrases(next)) {
+  const submitButton = form.querySelector("button[type=submit]");
+  submitButton.disabled = true;
+  const phrase = await insertPhrase(text);
+  submitButton.disabled = false;
+  if (!phrase) {
     formMessage.textContent = SAVE_ERROR_MESSAGE;
     return;
   }
 
-  phrases = next;
   input.value = "";
   formMessage.textContent = "";
   input.focus();
   // 전체를 다시 그리면 편집 중인 내용이 사라지므로 새 문구만 추가한다.
   list.prepend(createPhraseItem(phrase));
-  emptyMessage.hidden = true;
+  setListMessage("");
 });
 
 input.after(createDateToolbar(input));
-render();
+
+client.auth.onAuthStateChange((event, session) => {
+  const userId = session ? session.user.id : null;
+  // 탭으로 돌아올 때도 이벤트가 오므로, 편집 내용이 사라지지 않게 사용자가 바뀔 때만 화면을 바꾼다.
+  if (userId === currentUserId) {
+    return;
+  }
+  currentUserId = userId;
+  // 이 콜백 안에서 Supabase를 바로 호출하면 멈출 수 있어 콜백이 끝난 뒤 실행한다.
+  setTimeout(userId ? showApp : showLogin);
+});
+
 // 페이지를 켜 둔 채 날짜가 바뀌어도 화면이 복사될 값과 같도록 유지한다.
 setInterval(refreshDates, DATE_CHECK_MS);
