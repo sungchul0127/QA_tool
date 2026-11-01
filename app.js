@@ -64,6 +64,12 @@ async function updatePhrase(id, text) {
   return error ? null : data;
 }
 
+async function deletePhrase(id) {
+  const { data, error } = await client.from("phrases").delete().eq("id", id).select("id");
+  // 권한 규칙에 막히면 오류 없이 0건이 되므로 실제로 지워졌는지 확인한다.
+  return !error && data.length > 0;
+}
+
 // 온라인 저장 전에 이 브라우저에 저장해 둔 문구를 한 번만 옮긴다.
 async function importLegacyPhrases() {
   let saved;
@@ -216,7 +222,47 @@ function createPhraseItem(phrase) {
 
   const actions = document.createElement("div");
   actions.className = "phrase-actions";
-  actions.append(button, editButton);
+
+  const deleteButton = document.createElement("button");
+  deleteButton.type = "button";
+  deleteButton.textContent = "삭제";
+  deleteButton.addEventListener("click", () => {
+    const question = document.createElement("span");
+    question.className = "delete-question";
+    question.setAttribute("role", "status");
+    question.textContent = "삭제할까요?";
+
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.textContent = "취소";
+    cancelButton.addEventListener("click", () => {
+      actions.replaceChildren(button, editButton, deleteButton);
+    });
+
+    const confirmButton = document.createElement("button");
+    confirmButton.type = "button";
+    confirmButton.className = "button-danger";
+    confirmButton.textContent = "삭제";
+    confirmButton.addEventListener("click", async () => {
+      confirmButton.disabled = true;
+      const deleted = await deletePhrase(phrase.id);
+      confirmButton.disabled = false;
+      if (!deleted) {
+        question.textContent = "삭제하지 못했습니다.";
+        return;
+      }
+
+      item.remove();
+      if (!list.children.length) {
+        setListMessage(EMPTY_LIST_MESSAGE);
+      }
+    });
+
+    actions.replaceChildren(question, cancelButton, confirmButton);
+    cancelButton.focus();
+  });
+
+  actions.append(button, editButton, deleteButton);
 
   item.append(text, actions);
   return item;

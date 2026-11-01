@@ -191,6 +191,32 @@ textarea {
   gap: 8px;
 }
 
+.delete-question {
+  align-self: center;
+  font-size: 14px;
+}
+
+.button-danger {
+  border-color: var(--error);
+  background: var(--error);
+  color: #ffffff;
+}
+
+.button-danger:hover {
+  background: var(--error);
+  opacity: 0.85;
+}
+
+@media (max-width: 480px) {
+  .phrase-item {
+    flex-direction: column;
+  }
+
+  .phrase-actions {
+    align-self: flex-end;
+  }
+}
+
 .phrase-editor {
   padding: 16px;
   background: var(--surface);

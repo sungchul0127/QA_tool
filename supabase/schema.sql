@@ -9,7 +9,7 @@ create table public.phrases (
 alter table public.phrases enable row level security;
 
 revoke all on public.phrases from anon, authenticated;
-grant select, insert, update on public.phrases to authenticated;
+grant select, insert, update, delete on public.phrases to authenticated;
 
 create policy "본인 문구 조회" on public.phrases
   for select to authenticated
@@ -23,3 +23,7 @@ create policy "본인 문구 수정" on public.phrases
   for update to authenticated
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
+
+create policy "본인 문구 삭제" on public.phrases
+  for delete to authenticated
+  using ((select auth.uid()) = user_id);
