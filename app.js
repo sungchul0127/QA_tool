@@ -194,19 +194,29 @@ function createPhraseItem(phrase) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "copy-button";
-  button.textContent = "복사";
+
+  const setCopyState = (icon, label) => {
+    button.textContent = icon;
+    button.title = label;
+    button.setAttribute("aria-label", label);
+  };
+  setCopyState("📋", "복사");
 
   let resetTimer;
   button.addEventListener("click", async () => {
     refreshDates();
     const copied = await copyText(applyDateVariables(phrase.text, new Date()));
-    button.textContent = copied ? "복사됨" : "복사 실패";
+    if (copied) {
+      setCopyState("✅", "복사됨");
+    } else {
+      setCopyState("⚠️", "복사 실패");
+    }
     button.classList.toggle("is-copied", copied);
     button.classList.toggle("is-failed", !copied);
 
     clearTimeout(resetTimer);
     resetTimer = setTimeout(() => {
-      button.textContent = "복사";
+      setCopyState("📋", "복사");
       button.classList.remove("is-copied", "is-failed");
     }, COPY_FEEDBACK_MS);
   });
