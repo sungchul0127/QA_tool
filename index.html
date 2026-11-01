@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QA 툴</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>QA 툴</h1>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>문구 등록</h2>
+      <form id="phrase-form">
+        <label for="phrase-input" class="sr-only">등록할 문구</label>
+        <textarea id="phrase-input" rows="4" placeholder="자주 쓰는 문구를 입력하세요"></textarea>
+        <div class="form-footer">
+          <p id="form-message" class="message" role="status"></p>
+          <button type="submit" class="button-primary">등록</button>
+        </div>
+      </form>
+    </section>
+
+    <section>
+      <h2>등록된 문구</h2>
+      <p id="empty-message" class="empty">아직 등록된 문구가 없습니다.</p>
+      <ul id="phrase-list" class="phrase-list"></ul>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
