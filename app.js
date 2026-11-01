@@ -10,14 +10,24 @@ const DATE_CHECK_MS = 60000;
 
 const pad = (value) => String(value).padStart(2, "0");
 
-const DATE_VARIABLES = {
-  "{YYYY-MM-DD}": (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-  "{YYYY.MM.DD}": (d) => `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`,
-  "{MM/DD}": (d) => `${pad(d.getMonth() + 1)}/${pad(d.getDate())}`,
-  "{M월 D일}": (d) => `${d.getMonth() + 1}월 ${d.getDate()}일`,
+const DATE_FORMATS = {
+  "YYYY-MM-DD": (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+  "YYYY.MM.DD": (d) => `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`,
+  "MM/DD": (d) => `${pad(d.getMonth() + 1)}/${pad(d.getDate())}`,
+  "M월 D일": (d) => `${d.getMonth() + 1}월 ${d.getDate()}일`,
 };
-// 캡처 그룹이 있어 split 결과의 홀수 번째 항목이 변수가 된다.
-const DATE_VARIABLE_PATTERN = /(\{YYYY-MM-DD\}|\{YYYY\.MM\.DD\}|\{MM\/DD\}|\{M월 D일\})/;
+
+const addDays = (d, days) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
+
+const DATE_BASES = [
+  { label: "오늘", prefix: "", resolve: (d) => d },
+  { label: "내일", prefix: "내일 ", resolve: (d) => addDays(d, 1) },
+  // 오늘 이후 가장 가까운 월요일이다. 월요일에는 7일 뒤, 일요일에는 다음 날이 된다.
+  { label: "다음주 월요일", prefix: "다음주 월요일 ", resolve: (d) => addDays(d, (8 - d.getDay()) % 7 || 7) },
+];
+
+// 캡처 그룹이 하나뿐이라 split 결과의 홀수 번째 항목이 변수가 된다.
+const DATE_VARIABLE_PATTERN = /(\{(?:내일 |다음주 월요일 )?(?:YYYY-MM-DD|YYYY\.MM\.DD|MM\/DD|M월 D일)\})/;
 
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
@@ -95,13 +105,19 @@ async function importLegacyPhrases() {
 }
 
 function dateKey() {
-  return DATE_VARIABLES["{YYYY-MM-DD}"](new Date());
+  return DATE_FORMATS["YYYY-MM-DD"](new Date());
+}
+
+function formatDateVariable(token, date) {
+  const inner = token.slice(1, -1);
+  const base = DATE_BASES.find((b) => b.prefix && inner.startsWith(b.prefix)) || DATE_BASES[0];
+  return DATE_FORMATS[inner.slice(base.prefix.length)](base.resolve(date));
 }
 
 function applyDateVariables(template, date) {
   return template
     .split(DATE_VARIABLE_PATTERN)
-    .map((part, index) => (index % 2 ? DATE_VARIABLES[part](date) : part))
+    .map((part, index) => (index % 2 ? formatDateVariable(part, date) : part))
     .join("");
 }
 
@@ -113,7 +129,7 @@ function renderPhraseText(element, template) {
     }
     const value = document.createElement("span");
     value.className = "date-value";
-    value.textContent = DATE_VARIABLES[part](date);
+    value.textContent = formatDateVariable(part, date);
     return value;
   });
   element.replaceChildren(...nodes);
@@ -130,7 +146,7 @@ function refreshDates() {
     renderPhraseText(element, element.dataset.template);
   });
   document.querySelectorAll(".date-button").forEach((button) => {
-    button.textContent = DATE_VARIABLES[button.dataset.token](date);
+    button.textContent = formatDateVariable(button.dataset.token, date);
   });
 }
 
@@ -138,23 +154,32 @@ function createDateToolbar(textarea) {
   const toolbar = document.createElement("div");
   toolbar.className = "date-toolbar";
 
-  const label = document.createElement("span");
-  label.textContent = "오늘 날짜 넣기";
-  toolbar.append(label);
-
   const date = new Date();
-  Object.keys(DATE_VARIABLES).forEach((token) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "date-button";
-    button.dataset.token = token;
-    button.title = `${token} 넣기`;
-    button.textContent = DATE_VARIABLES[token](date);
-    button.addEventListener("click", () => {
-      textarea.setRangeText(token, textarea.selectionStart, textarea.selectionEnd, "end");
-      textarea.focus();
+  DATE_BASES.forEach((base) => {
+    const row = document.createElement("div");
+    row.className = "date-row";
+
+    const label = document.createElement("span");
+    label.className = "date-label";
+    label.textContent = base.label;
+    row.append(label);
+
+    Object.keys(DATE_FORMATS).forEach((format) => {
+      const token = `{${base.prefix}${format}}`;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "date-button";
+      button.dataset.token = token;
+      button.title = `${token} 넣기`;
+      button.textContent = formatDateVariable(token, date);
+      button.addEventListener("click", () => {
+        textarea.setRangeText(token, textarea.selectionStart, textarea.selectionEnd, "end");
+        textarea.focus();
+      });
+      row.append(button);
     });
-    toolbar.append(button);
+
+    toolbar.append(row);
   });
 
   return toolbar;

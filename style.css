@@ -164,13 +164,22 @@ textarea {
 }
 
 .date-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  display: grid;
   gap: 6px;
   margin-top: 8px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.date-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-label {
+  width: 88px;
 }
 
 .date-button {
