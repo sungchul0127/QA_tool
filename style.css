@@ -147,20 +147,37 @@ textarea {
 
 .phrase-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px;
+  padding: 10px 16px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 
-.phrase-text {
+.phrase-title {
   margin: 0;
   min-width: 0;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.phrase-title.is-untitled {
+  color: var(--muted);
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+input + .field-label {
+  margin-top: 12px;
+}
+
+.phrase-editor input {
+  margin-bottom: 8px;
 }
 
 .date-toolbar {
@@ -185,13 +202,6 @@ textarea {
 .date-button {
   padding: 2px 8px;
   font-size: 13px;
-}
-
-.date-value {
-  padding: 0 4px;
-  border-radius: 4px;
-  background: #e4ecfb;
-  color: var(--primary);
 }
 
 .phrase-actions {
@@ -241,13 +251,4 @@ textarea {
 .copy-button.is-failed {
   border-color: var(--error);
   color: var(--error);
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }

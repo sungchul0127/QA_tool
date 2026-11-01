@@ -39,6 +39,7 @@ const loginMessage = document.getElementById("login-message");
 const logoutButton = document.getElementById("logout-button");
 const appView = document.getElementById("app-view");
 const form = document.getElementById("phrase-form");
+const titleInput = document.getElementById("phrase-title");
 const input = document.getElementById("phrase-input");
 const formMessage = document.getElementById("form-message");
 const listMessage = document.getElementById("list-message");
@@ -51,7 +52,7 @@ let currentUserId;
 async function fetchPhrases() {
   const { data, error } = await client
     .from("phrases")
-    .select("id, text")
+    .select("id, title, text")
     .order("created_at", { ascending: false });
   if (error) {
     throw error;
@@ -59,17 +60,21 @@ async function fetchPhrases() {
   return data;
 }
 
-async function insertPhrase(text) {
-  const { data, error } = await client.from("phrases").insert({ text }).select("id, text").single();
+async function insertPhrase(title, text) {
+  const { data, error } = await client
+    .from("phrases")
+    .insert({ title, text })
+    .select("id, title, text")
+    .single();
   return error ? null : data;
 }
 
-async function updatePhrase(id, text) {
+async function updatePhrase(id, title, text) {
   const { data, error } = await client
     .from("phrases")
-    .update({ text })
+    .update({ title, text })
     .eq("id", id)
-    .select("id, text")
+    .select("id, title, text")
     .single();
   return error ? null : data;
 }
@@ -95,6 +100,7 @@ async function importLegacyPhrases() {
   // 목록이 최신순이므로 앞선 문구일수록 시간이 늦어야 순서가 유지된다.
   const now = Date.now();
   const rows = saved.map((phrase, index) => ({
+    title: phrase.text.split("\n")[0].slice(0, 100),
     text: phrase.text,
     created_at: new Date(now - index).toISOString(),
   }));
@@ -121,20 +127,6 @@ function applyDateVariables(template, date) {
     .join("");
 }
 
-function renderPhraseText(element, template) {
-  const date = new Date();
-  const nodes = template.split(DATE_VARIABLE_PATTERN).map((part, index) => {
-    if (index % 2 === 0) {
-      return part;
-    }
-    const value = document.createElement("span");
-    value.className = "date-value";
-    value.textContent = formatDateVariable(part, date);
-    return value;
-  });
-  element.replaceChildren(...nodes);
-}
-
 function refreshDates() {
   if (dateKey() === shownDate) {
     return;
@@ -142,9 +134,6 @@ function refreshDates() {
   shownDate = dateKey();
 
   const date = new Date();
-  document.querySelectorAll(".phrase-text").forEach((element) => {
-    renderPhraseText(element, element.dataset.template);
-  });
   document.querySelectorAll(".date-button").forEach((button) => {
     button.textContent = formatDateVariable(button.dataset.token, date);
   });
@@ -211,10 +200,10 @@ function createPhraseItem(phrase) {
   const item = document.createElement("li");
   item.className = "phrase-item";
 
-  const text = document.createElement("p");
-  text.className = "phrase-text";
-  text.dataset.template = phrase.text;
-  renderPhraseText(text, phrase.text);
+  const title = document.createElement("p");
+  title.className = "phrase-title";
+  title.classList.toggle("is-untitled", !phrase.title);
+  title.textContent = phrase.title || "(제목 없음)";
 
   const button = document.createElement("button");
   button.type = "button";
@@ -248,7 +237,7 @@ function createPhraseItem(phrase) {
 
   const editButton = document.createElement("button");
   editButton.type = "button";
-  editButton.textContent = "편집";
+  editButton.textContent = "수정";
   editButton.addEventListener("click", () => {
     const editor = createPhraseEditor(phrase);
     item.replaceWith(editor);
@@ -299,7 +288,7 @@ function createPhraseItem(phrase) {
 
   actions.append(button, editButton, deleteButton);
 
-  item.append(text, actions);
+  item.append(title, actions);
   return item;
 }
 
@@ -307,10 +296,17 @@ function createPhraseEditor(phrase) {
   const editor = document.createElement("li");
   editor.className = "phrase-editor";
 
+  const titleField = document.createElement("input");
+  titleField.type = "text";
+  titleField.maxLength = 100;
+  titleField.value = phrase.title;
+  titleField.placeholder = "제목";
+  titleField.setAttribute("aria-label", "제목 수정");
+
   const textarea = document.createElement("textarea");
   textarea.rows = 4;
   textarea.value = phrase.text;
-  textarea.setAttribute("aria-label", "문구 편집");
+  textarea.setAttribute("aria-label", "내용 수정");
 
   const message = document.createElement("p");
   message.className = "message";
@@ -328,15 +324,16 @@ function createPhraseEditor(phrase) {
   saveButton.className = "button-primary";
   saveButton.textContent = "저장";
   saveButton.addEventListener("click", async () => {
+    const title = titleField.value.trim();
     const text = textarea.value.trim();
-    if (!text) {
-      message.textContent = "문구를 입력해 주세요.";
-      textarea.focus();
+    if (!title || !text) {
+      message.textContent = "제목과 내용을 모두 입력해 주세요.";
+      (title ? textarea : titleField).focus();
       return;
     }
 
     saveButton.disabled = true;
-    const updated = await updatePhrase(phrase.id, text);
+    const updated = await updatePhrase(phrase.id, title, text);
     saveButton.disabled = false;
     if (!updated) {
       message.textContent = SAVE_ERROR_MESSAGE;
@@ -354,7 +351,7 @@ function createPhraseEditor(phrase) {
   footer.className = "form-footer";
   footer.append(message, actions);
 
-  editor.append(textarea, createDateToolbar(textarea), footer);
+  editor.append(titleField, textarea, createDateToolbar(textarea), footer);
   return editor;
 }
 
@@ -390,6 +387,7 @@ function showLogin() {
   logoutButton.hidden = true;
   loginView.hidden = false;
   list.replaceChildren();
+  titleInput.value = "";
   input.value = "";
   formMessage.textContent = "";
   loginPassword.value = "";
@@ -419,25 +417,27 @@ logoutButton.addEventListener("click", () => {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
+  const title = titleInput.value.trim();
   const text = input.value.trim();
-  if (!text) {
-    formMessage.textContent = "문구를 입력해 주세요.";
-    input.focus();
+  if (!title || !text) {
+    formMessage.textContent = "제목과 내용을 모두 입력해 주세요.";
+    (title ? input : titleInput).focus();
     return;
   }
 
   const submitButton = form.querySelector("button[type=submit]");
   submitButton.disabled = true;
-  const phrase = await insertPhrase(text);
+  const phrase = await insertPhrase(title, text);
   submitButton.disabled = false;
   if (!phrase) {
     formMessage.textContent = SAVE_ERROR_MESSAGE;
     return;
   }
 
+  titleInput.value = "";
   input.value = "";
   formMessage.textContent = "";
-  input.focus();
+  titleInput.focus();
   // 전체를 다시 그리면 편집 중인 내용이 사라지므로 새 문구만 추가한다.
   list.prepend(createPhraseItem(phrase));
   setListMessage("");

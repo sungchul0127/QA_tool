@@ -2,6 +2,7 @@
 create table public.phrases (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  title text not null default '',
   text text not null check (char_length(trim(text)) > 0),
   created_at timestamptz not null default now()
 );

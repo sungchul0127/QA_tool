@@ -32,7 +32,9 @@
     <section class="card">
       <h2>문구 등록</h2>
       <form id="phrase-form">
-        <label for="phrase-input" class="sr-only">등록할 문구</label>
+        <label for="phrase-title" class="field-label">제목</label>
+        <input id="phrase-title" type="text" maxlength="100" placeholder="목록에 보일 제목을 입력하세요">
+        <label for="phrase-input" class="field-label">내용</label>
         <textarea id="phrase-input" rows="4" placeholder="자주 쓰는 문구를 입력하세요"></textarea>
         <div class="form-footer">
           <p id="form-message" class="message" role="status"></p>
