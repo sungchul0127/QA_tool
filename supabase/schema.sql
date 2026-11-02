@@ -1,5 +1,5 @@
 -- 새 Supabase 프로젝트의 SQL Editor에서 한 번만 실행한다.
--- 이미 예전 schema.sql을 실행한 프로젝트는 대신 migration-folders.sql을 실행한다.
+-- 이미 예전 schema.sql을 실행한 프로젝트는 대신 migration-folders.sql, migration-phrase-folders.sql을 차례로 실행한다.
 
 -- 빈 폴더도 유지해야 하므로 별도 테이블로 둔다.
 create table public.folders (
@@ -38,8 +38,6 @@ create table public.phrases (
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   title text not null default '',
   text text not null check (char_length(trim(text)) > 0),
-  -- 폴더를 지우면 문구는 남고 "전체"에서만 보인다.
-  folder_id uuid references public.folders (id) on delete set null,
   -- 작을수록 위에 보인다. 끌어서 옮길 때 앞뒤 값의 중간값을 쓰므로 실수형이다.
   sort_order double precision not null default 0,
   created_at timestamptz not null default now()
@@ -66,5 +64,37 @@ create policy "본인 문구 수정" on public.phrases
   with check ((select auth.uid()) = user_id);
 
 create policy "본인 문구 삭제" on public.phrases
+  for delete to authenticated
+  using ((select auth.uid()) = user_id);
+
+-- 문구 하나를 여러 폴더에 넣을 수 있다. 폴더나 문구를 지우면 연결도 지워진다.
+create table public.phrase_folders (
+  phrase_id uuid not null references public.phrases (id) on delete cascade,
+  folder_id uuid not null references public.folders (id) on delete cascade,
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  primary key (phrase_id, folder_id)
+);
+
+create index phrase_folders_folder_idx on public.phrase_folders (folder_id);
+
+alter table public.phrase_folders enable row level security;
+
+revoke all on public.phrase_folders from anon, authenticated;
+grant select, insert, delete on public.phrase_folders to authenticated;
+
+create policy "본인 연결 조회" on public.phrase_folders
+  for select to authenticated
+  using ((select auth.uid()) = user_id);
+
+-- 본인 문구를 본인 폴더에만 넣을 수 있다.
+create policy "본인 연결 등록" on public.phrase_folders
+  for insert to authenticated
+  with check (
+    (select auth.uid()) = user_id
+    and exists (select 1 from public.phrases p where p.id = phrase_id and p.user_id = (select auth.uid()))
+    and exists (select 1 from public.folders f where f.id = folder_id and f.user_id = (select auth.uid()))
+  );
+
+create policy "본인 연결 삭제" on public.phrase_folders
   for delete to authenticated
   using ((select auth.uid()) = user_id);

@@ -53,7 +53,7 @@
         <span class="shortcut"><kbd>↑ ↓</kbd>선택</span>
         <span class="shortcut"><kbd>Enter</kbd>선택 문구 복사</span>
         <span class="shortcut"><kbd>N</kbd>새 문구</span>
-        <span class="shortcut"><kbd>⋮⋮</kbd>끌어서 순서 변경 · 탭 위에 놓으면 폴더 이동</span>
+        <span class="shortcut"><kbd>⋮⋮</kbd>끌어서 순서 변경 · 탭 위에 놓으면 폴더에 추가 · 탭 더블클릭으로 이름 변경</span>
       </div>
 
       <p id="list-message" class="empty" role="status" hidden></p>
@@ -64,14 +64,13 @@
   <div id="editor-overlay" class="modal-overlay" hidden>
     <form id="editor-form" class="modal" role="dialog" aria-modal="true" aria-labelledby="editor-heading" novalidate>
       <h2 id="editor-heading" class="modal-title">새 문구</h2>
-      <div class="modal-grid">
-        <label class="field">제목
-          <input id="editor-title" type="text" maxlength="100" placeholder="목록에 보일 제목">
-        </label>
-        <label class="field">폴더
-          <select id="editor-folder"></select>
-        </label>
-      </div>
+      <label class="field">제목
+        <input id="editor-title" type="text" maxlength="100" placeholder="목록에 보일 제목">
+      </label>
+      <fieldset class="field folder-field">
+        <legend>폴더 <span class="field-note">여러 개 고를 수 있습니다</span></legend>
+        <div id="editor-folders" class="folder-checks"></div>
+      </fieldset>
       <label id="editor-text-field" class="field">내용
         <textarea id="editor-text" rows="6" placeholder="자주 쓰는 문구를 입력하세요"></textarea>
       </label>
@@ -82,6 +81,19 @@
         <button type="button" id="editor-cancel" class="button-secondary modal-cancel">취소</button>
       </div>
     </form>
+  </div>
+
+  <div id="folder-delete-overlay" class="modal-overlay" hidden>
+    <div class="modal modal-small" role="alertdialog" aria-modal="true" aria-labelledby="folder-delete-heading" aria-describedby="folder-delete-body">
+      <h2 id="folder-delete-heading" class="modal-title"></h2>
+      <div id="folder-delete-body" class="modal-body"></div>
+      <div class="modal-footer">
+        <p id="folder-delete-message" class="modal-message" role="status" hidden></p>
+        <button type="button" id="folder-delete-with-phrases" class="button-danger modal-danger">문구도 함께 삭제</button>
+        <button type="button" id="folder-delete-only" class="button-primary modal-save">폴더만 삭제</button>
+        <button type="button" id="folder-delete-cancel" class="button-secondary modal-cancel">취소</button>
+      </div>
+    </div>
   </div>
 
   <div id="toast" class="toast" role="status" hidden></div>

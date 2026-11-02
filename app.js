@@ -13,9 +13,10 @@ const EMPTY_FOLDER_MESSAGE = "이 폴더에 문구가 없습니다.";
 const LOADING_MESSAGE = "문구를 불러오는 중입니다.";
 const LOAD_ERROR_MESSAGE = "문구를 불러오지 못했습니다. 새로고침해 주세요.";
 const DATE_CHECK_MS = 60000;
+const DOUBLE_CLICK_MS = 400;
 // 중간값으로 끼워 넣다가 간격이 이보다 좁아지면 전체 순서를 다시 매긴다.
 const MIN_SORT_GAP = 1e-6;
-const PHRASE_COLUMNS = "id, title, text, folder_id, sort_order";
+const PHRASE_COLUMNS = "id, title, text, sort_order, phrase_folders(folder_id)";
 const FOLDER_COLUMNS = "id, name, sort_order";
 
 const pad = (value) => String(value).padStart(2, "0");
@@ -59,13 +60,20 @@ const editorOverlay = document.getElementById("editor-overlay");
 const editorForm = document.getElementById("editor-form");
 const editorHeading = document.getElementById("editor-heading");
 const editorTitle = document.getElementById("editor-title");
-const editorFolder = document.getElementById("editor-folder");
+const editorFolders = document.getElementById("editor-folders");
 const editorTextField = document.getElementById("editor-text-field");
 const editorText = document.getElementById("editor-text");
 const editorMessage = document.getElementById("editor-message");
 const editorHint = document.getElementById("editor-hint");
 const editorSave = document.getElementById("editor-save");
 const editorCancel = document.getElementById("editor-cancel");
+const folderDeleteOverlay = document.getElementById("folder-delete-overlay");
+const folderDeleteHeading = document.getElementById("folder-delete-heading");
+const folderDeleteBody = document.getElementById("folder-delete-body");
+const folderDeleteMessage = document.getElementById("folder-delete-message");
+const folderDeleteWithPhrases = document.getElementById("folder-delete-with-phrases");
+const folderDeleteOnly = document.getElementById("folder-delete-only");
+const folderDeleteCancel = document.getElementById("folder-delete-cancel");
 const toast = document.getElementById("toast");
 
 let shownDate = dateKey();
@@ -82,9 +90,13 @@ const state = {
   // { id, busy, failed }
   confirmDelete: null,
   addingFolder: false,
+  renamingFolderId: null,
 };
 // null 또는 { mode: "new" | "edit", id }
 let editor = null;
+// 삭제 확인창을 띄운 폴더. null이면 닫혀 있다.
+let deletingFolder = null;
+let lastTabClick = { key: null, time: 0 };
 // 끄는 중인 문구. 끄는 동안 목록을 다시 그리면 끌기가 끊기므로 그리기를 미룬다.
 let drag = null;
 let renderPending = false;
@@ -92,6 +104,12 @@ let copiedTimer;
 let toastTimer;
 
 /* ---------- Supabase ---------- */
+
+// 연결 테이블 행을 폴더 id 목록으로 바꿔 둔다.
+function toPhrase(row) {
+  const { phrase_folders: links = [], ...phrase } = row;
+  return { ...phrase, folder_ids: links.map((link) => link.folder_id) };
+}
 
 async function fetchPhrases() {
   const { data, error } = await client
@@ -102,7 +120,7 @@ async function fetchPhrases() {
   if (error) {
     throw error;
   }
-  return data;
+  return data.map(toPhrase);
 }
 
 async function fetchFolders() {
@@ -119,7 +137,7 @@ async function fetchFolders() {
 
 async function insertPhrase(row) {
   const { data, error } = await client.from("phrases").insert(row).select(PHRASE_COLUMNS).single();
-  return error ? null : data;
+  return error ? null : toPhrase(data);
 }
 
 async function updatePhrase(id, changes) {
@@ -129,13 +147,45 @@ async function updatePhrase(id, changes) {
     .eq("id", id)
     .select(PHRASE_COLUMNS)
     .single();
-  return error ? null : data;
+  return error ? null : toPhrase(data);
 }
 
-async function deletePhrase(id) {
-  const { data, error } = await client.from("phrases").delete().eq("id", id).select("id");
-  // 권한 규칙에 막히면 오류 없이 0건이 되므로 실제로 지워졌는지 확인한다.
-  return !error && data.length > 0;
+async function deletePhrases(ids) {
+  const { data, error } = await client.from("phrases").delete().in("id", ids).select("id");
+  // 권한 규칙에 막히면 오류 없이 0건이 되므로 실제로 지워진 id를 돌려준다.
+  return error ? [] : data.map((row) => row.id);
+}
+
+async function addPhraseFolders(phraseId, folderIds) {
+  if (!folderIds.length) {
+    return true;
+  }
+  const rows = folderIds.map((folderId) => ({ phrase_id: phraseId, folder_id: folderId }));
+  const { error } = await client.from("phrase_folders").insert(rows);
+  return !error;
+}
+
+async function removePhraseFolders(phraseId, folderIds) {
+  if (!folderIds.length) {
+    return true;
+  }
+  const { error } = await client
+    .from("phrase_folders")
+    .delete()
+    .eq("phrase_id", phraseId)
+    .in("folder_id", folderIds);
+  return !error;
+}
+
+// 문구가 들어 있는 폴더를 nextIds로 맞춘다.
+async function setPhraseFolders(phraseId, currentIds, nextIds) {
+  const added = nextIds.filter((id) => !currentIds.includes(id));
+  const removed = currentIds.filter((id) => !nextIds.includes(id));
+  const [addedOk, removedOk] = await Promise.all([
+    addPhraseFolders(phraseId, added),
+    removePhraseFolders(phraseId, removed),
+  ]);
+  return addedOk && removedOk;
 }
 
 async function updateSortOrders(changes) {
@@ -150,6 +200,21 @@ async function insertFolder(name, sortOrder) {
     .select(FOLDER_COLUMNS)
     .single();
   return error ? null : data;
+}
+
+// 성공하면 "ok", 같은 이름이 있으면 "duplicate", 그 밖의 실패는 "error"를 돌려준다.
+async function renameFolderRow(id, name) {
+  const { data, error } = await client.from("folders").update({ name }).eq("id", id).select("id");
+  if (error) {
+    // 23505: 사용자별 폴더 이름 고유 조건 위반
+    return error.code === "23505" ? "duplicate" : "error";
+  }
+  return data.length ? "ok" : "error";
+}
+
+async function deleteFolderRow(id) {
+  const { data, error } = await client.from("folders").delete().eq("id", id).select("id");
+  return !error && data.length > 0;
 }
 
 // 온라인 저장 전에 이 브라우저에 저장해 둔 문구를 한 번만 옮긴다.
@@ -342,7 +407,11 @@ function visiblePhrases() {
   if (state.currentFolder === "all") {
     return state.phrases;
   }
-  return state.phrases.filter((phrase) => phrase.folder_id === state.currentFolder);
+  return state.phrases.filter((phrase) => phrase.folder_ids.includes(state.currentFolder));
+}
+
+function phrasesInFolder(folderId) {
+  return state.phrases.filter((phrase) => phrase.folder_ids.includes(folderId));
 }
 
 function folderName(id) {
@@ -363,7 +432,7 @@ function render() {
   }
   renderPending = false;
   // 폴더 이름을 입력하는 중에 탭을 다시 그리면 입력창이 사라지므로 입력이 끝난 뒤 그린다.
-  if (!state.addingFolder) {
+  if (!state.addingFolder && !state.renamingFolderId) {
     renderTabs();
   }
   renderList();
@@ -375,12 +444,16 @@ function renderTabs() {
     ...state.folders.map((folder) => ({
       key: folder.id,
       name: folder.name,
-      count: state.phrases.filter((phrase) => phrase.folder_id === folder.id).length,
+      count: phrasesInFolder(folder.id).length,
     })),
-  ].map(createFolderTab);
+  ].map((tab) =>
+    tab.key === state.renamingFolderId
+      ? createFolderInput(tab.name, (value) => commitRename(tab.key, value), cancelRename)
+      : createFolderTab(tab),
+  );
 
   if (state.addingFolder) {
-    tabs.push(createFolderInput());
+    tabs.push(createFolderInput("", commitFolder, cancelAddFolder));
   }
 
   tabs.push(
@@ -396,58 +469,77 @@ function renderTabs() {
   const folderInput = folderTabs.querySelector(".folder-name-input");
   if (folderInput) {
     folderInput.focus();
+    folderInput.select();
   }
 }
 
 function createFolderTab(tab) {
-  const node = button("folder-tab", undefined, () => setCurrentFolder(tab.key));
-  node.classList.toggle("is-active", state.currentFolder === tab.key);
-  node.append(element("span", null, tab.name), element("span", "folder-count", String(tab.count)));
+  const isActive = state.currentFolder === tab.key;
+  const node = element("div", "folder-tab");
+  node.classList.toggle("is-active", isActive);
+  node.dataset.folderId = tab.key;
 
-  // "전체"는 폴더가 아니므로 문구를 놓을 수 없다.
-  if (tab.key !== "all") {
-    node.addEventListener("dragover", (event) => {
-      if (!drag) {
-        return;
-      }
-      event.preventDefault();
-      node.classList.add("is-drop-target");
-    });
-    node.addEventListener("dragleave", () => {
-      node.classList.remove("is-drop-target");
-    });
-    node.addEventListener("drop", (event) => {
-      event.preventDefault();
-      if (!drag) {
-        return;
-      }
-      const id = drag.id;
-      endDrag();
-      movePhraseToFolder(id, tab.key);
-    });
+  const label = button("folder-tab-button", undefined, () => clickFolderTab(tab.key));
+  label.append(element("span", null, tab.name), element("span", "folder-count", String(tab.count)));
+  node.append(label);
+
+  // "전체"는 폴더가 아니므로 이름을 바꾸거나 지우거나 문구를 놓을 수 없다.
+  if (tab.key === "all") {
+    return node;
   }
+
+  label.title = "더블클릭해서 이름 변경";
+  if (isActive) {
+    const deleteButton = button("folder-delete", "×", () => openFolderDelete(tab.key));
+    deleteButton.title = "폴더 삭제";
+    deleteButton.setAttribute("aria-label", `'${tab.name}' 폴더 삭제`);
+    node.append(deleteButton);
+  }
+
+  node.addEventListener("dragover", (event) => {
+    if (!drag) {
+      return;
+    }
+    event.preventDefault();
+    node.classList.add("is-drop-target");
+  });
+  node.addEventListener("dragleave", (event) => {
+    // 탭 안의 버튼 사이를 지날 때는 표시를 유지한다.
+    if (!node.contains(event.relatedTarget)) {
+      node.classList.remove("is-drop-target");
+    }
+  });
+  node.addEventListener("drop", (event) => {
+    event.preventDefault();
+    if (!drag) {
+      return;
+    }
+    const id = drag.id;
+    endDrag();
+    addPhraseToFolder(id, tab.key);
+  });
   return node;
 }
 
-function createFolderInput() {
+function createFolderInput(value, onCommit, onCancel) {
   const folderInput = element("input", "folder-name-input");
   folderInput.type = "text";
   folderInput.maxLength = 50;
+  folderInput.value = value;
   folderInput.placeholder = "폴더 이름 후 Enter";
-  folderInput.setAttribute("aria-label", "새 폴더 이름");
+  folderInput.setAttribute("aria-label", value ? "폴더 이름 변경" : "새 폴더 이름");
   folderInput.addEventListener("keydown", (event) => {
     if (event.isComposing) {
       return;
     }
     if (event.key === "Enter") {
       event.preventDefault();
-      commitFolder(folderInput.value);
+      onCommit(folderInput.value);
     } else if (event.key === "Escape") {
-      state.addingFolder = false;
-      renderTabs();
+      onCancel();
     }
   });
-  folderInput.addEventListener("blur", () => commitFolder(folderInput.value));
+  folderInput.addEventListener("blur", () => onCommit(folderInput.value));
   return folderInput;
 }
 
@@ -493,9 +585,11 @@ function createPhraseItem(phrase, index) {
 
   item.append(handle, key, body);
 
-  const tagName = state.currentFolder === "all" ? folderName(phrase.folder_id) : "";
-  if (tagName) {
-    item.append(element("span", "folder-tag", tagName));
+  // "전체"에서는 들어 있는 폴더를 탭 순서대로 모두 보여 준다.
+  if (state.currentFolder === "all") {
+    state.folders
+      .filter((folder) => phrase.folder_ids.includes(folder.id))
+      .forEach((folder) => item.append(element("span", "folder-tag", folder.name)));
   }
 
   const confirming = state.confirmDelete && state.confirmDelete.id === phrase.id;
@@ -591,6 +685,18 @@ function setCurrentFolder(key) {
   render();
 }
 
+// 첫 클릭에 탭을 다시 그리므로 브라우저의 dblclick이 오지 않는다. 그래서 같은 탭을 연달아 누른 것을 직접 센다.
+function clickFolderTab(key) {
+  const now = Date.now();
+  const isDouble = key !== "all" && lastTabClick.key === key && now - lastTabClick.time < DOUBLE_CLICK_MS;
+  lastTabClick = isDouble ? { key: null, time: 0 } : { key, time: now };
+  if (isDouble) {
+    startRename(key);
+  } else {
+    setCurrentFolder(key);
+  }
+}
+
 function selectPhrase(id) {
   if (state.selectedId === id) {
     return;
@@ -628,7 +734,7 @@ function askDelete(id) {
 async function removePhrase(id) {
   state.confirmDelete = { id, busy: true, failed: false };
   render();
-  const deleted = await deletePhrase(id);
+  const deleted = (await deletePhrases([id])).length > 0;
   if (!deleted) {
     if (state.confirmDelete && state.confirmDelete.id === id) {
       state.confirmDelete = { id, busy: false, failed: true };
@@ -671,24 +777,178 @@ async function commitFolder(rawName) {
   setCurrentFolder(folder.id);
 }
 
-async function movePhraseToFolder(id, folderId) {
-  const phrase = state.phrases.find((p) => p.id === id);
-  if (!phrase || phrase.folder_id === folderId) {
+function cancelAddFolder() {
+  state.addingFolder = false;
+  renderTabs();
+}
+
+function startRename(folderId) {
+  if (state.addingFolder) {
+    return;
+  }
+  state.renamingFolderId = folderId;
+  renderTabs();
+}
+
+function cancelRename() {
+  state.renamingFolderId = null;
+  render();
+}
+
+async function commitRename(folderId, rawName) {
+  // Enter로 저장한 뒤 입력창이 사라지면서 blur가 한 번 더 올 수 있다.
+  if (state.renamingFolderId !== folderId) {
+    return;
+  }
+  state.renamingFolderId = null;
+
+  const folder = state.folders.find((f) => f.id === folderId);
+  const name = rawName.trim();
+  if (!folder || !name || name === folder.name) {
+    render();
+    return;
+  }
+  if (state.folders.some((f) => f.name === name)) {
+    render();
+    showToast("같은 이름의 폴더가 있습니다");
     return;
   }
 
-  const previous = state.phrases;
-  state.phrases = state.phrases.map((p) => (p.id === id ? { ...p, folder_id: folderId } : p));
+  const previousName = folder.name;
+  const setName = (value) => {
+    state.folders = state.folders.map((f) => (f.id === folderId ? { ...f, name: value } : f));
+  };
+  setName(name);
   render();
 
-  const updated = await updatePhrase(id, { folder_id: folderId });
-  if (!updated) {
-    state.phrases = previous;
+  const result = await renameFolderRow(folderId, name);
+  if (result !== "ok") {
+    setName(previousName);
+    render();
+    showToast(result === "duplicate" ? "같은 이름의 폴더가 있습니다" : SAVE_ERROR_MESSAGE);
+  }
+}
+
+// 탭 위에 놓으면 원래 폴더는 그대로 두고 그 폴더에도 넣는다.
+async function addPhraseToFolder(id, folderId) {
+  const phrase = state.phrases.find((p) => p.id === id);
+  if (!phrase || phrase.folder_ids.includes(folderId)) {
+    return;
+  }
+
+  const setFolders = (folderIds) => {
+    state.phrases = state.phrases.map((p) => (p.id === id ? { ...p, folder_ids: folderIds } : p));
+  };
+  const previousIds = phrase.folder_ids;
+  setFolders([...previousIds, folderId]);
+  render();
+
+  if (!(await addPhraseFolders(id, [folderId]))) {
+    setFolders(previousIds);
     render();
     showToast(SAVE_ERROR_MESSAGE);
     return;
   }
-  showToast(`'${folderName(folderId)}' 폴더로 옮겼습니다`);
+  showToast(`'${folderName(folderId)}' 폴더에 추가했습니다`);
+}
+
+/* ---------- 폴더 삭제 확인창 ---------- */
+
+function openFolderDelete(folderId) {
+  const folder = state.folders.find((f) => f.id === folderId);
+  if (!folder) {
+    return;
+  }
+  deletingFolder = folder;
+  state.confirmDelete = null;
+
+  const phrases = phrasesInFolder(folderId);
+  const shared = phrases.filter((phrase) => phrase.folder_ids.length > 1).length;
+
+  folderDeleteHeading.textContent = `'${folder.name}' 폴더를 삭제할까요?`;
+  const lines = [];
+  if (!phrases.length) {
+    lines.push(element("p", null, "폴더에 문구가 없습니다."));
+  } else {
+    lines.push(element("p", null, `"폴더만 삭제"하면 문구 ${phrases.length}개는 남고 이 폴더에서만 빠집니다.`));
+    const warning = element("p");
+    warning.append(`"문구도 함께 삭제"하면 문구 ${phrases.length}개가 모든 폴더에서 지워집니다.`);
+    if (shared) {
+      warning.append(" ", element("strong", null, `다른 폴더에도 있는 문구 ${shared}개도 함께 지워집니다.`));
+    }
+    lines.push(warning);
+  }
+  folderDeleteBody.replaceChildren(...lines);
+
+  folderDeleteWithPhrases.hidden = !phrases.length;
+  setFolderDeleteBusy(false);
+  setFolderDeleteMessage("");
+  folderDeleteOverlay.hidden = false;
+  render();
+  folderDeleteOnly.focus();
+}
+
+function closeFolderDelete() {
+  deletingFolder = null;
+  folderDeleteOverlay.hidden = true;
+}
+
+function setFolderDeleteBusy(busy) {
+  [folderDeleteWithPhrases, folderDeleteOnly, folderDeleteCancel].forEach((node) => {
+    node.disabled = busy;
+  });
+}
+
+function setFolderDeleteMessage(text) {
+  folderDeleteMessage.textContent = text;
+  folderDeleteMessage.hidden = !text;
+}
+
+async function deleteFolder(withPhrases) {
+  const folder = deletingFolder;
+  if (!folder) {
+    return;
+  }
+  setFolderDeleteBusy(true);
+  setFolderDeleteMessage("");
+
+  let removedPhrases = 0;
+  if (withPhrases) {
+    const ids = phrasesInFolder(folder.id).map((phrase) => phrase.id);
+    const deletedIds = ids.length ? await deletePhrases(ids) : [];
+    removedPhrases = deletedIds.length;
+    state.phrases = state.phrases.filter((phrase) => !deletedIds.includes(phrase.id));
+    if (deletedIds.length < ids.length) {
+      setFolderDeleteBusy(false);
+      setFolderDeleteMessage("문구를 모두 지우지 못했습니다. 다시 시도해 주세요.");
+      render();
+      return;
+    }
+  }
+
+  if (!(await deleteFolderRow(folder.id))) {
+    setFolderDeleteBusy(false);
+    setFolderDeleteMessage(SAVE_ERROR_MESSAGE);
+    render();
+    return;
+  }
+
+  // 폴더를 지우면 DB에서 연결도 함께 지워지므로 화면에서도 뺀다.
+  state.folders = state.folders.filter((f) => f.id !== folder.id);
+  state.phrases = state.phrases.map((phrase) =>
+    phrase.folder_ids.includes(folder.id)
+      ? { ...phrase, folder_ids: phrase.folder_ids.filter((id) => id !== folder.id) }
+      : phrase,
+  );
+  if (deletingFolder === folder) {
+    closeFolderDelete();
+  }
+  if (state.currentFolder === folder.id) {
+    setCurrentFolder("all");
+  } else {
+    render();
+  }
+  showToast(removedPhrases ? `폴더와 문구 ${removedPhrases}개를 삭제했습니다` : "폴더를 삭제했습니다");
 }
 
 async function reorderPhrase(dragId, targetId) {
@@ -743,21 +1003,17 @@ function openEditor(phrase) {
   state.confirmDelete = null;
   editor = phrase ? { mode: "edit", id: phrase.id } : { mode: "new" };
 
-  const options = [new Option("폴더 없음", ""), ...state.folders.map((folder) => new Option(folder.name, folder.id))];
-  editorFolder.replaceChildren(...options);
-
   if (phrase) {
     editorHeading.textContent = "문구 수정";
     editorTitle.value = phrase.title;
     editorText.value = phrase.text;
-    editorFolder.value = phrase.folder_id || "";
+    renderFolderChecks(phrase.folder_ids);
   } else {
     editorHeading.textContent = "새 문구";
     editorTitle.value = "";
     editorText.value = "";
-    const defaultFolder =
-      state.currentFolder !== "all" ? state.currentFolder : state.folders.length ? state.folders[0].id : "";
-    editorFolder.value = defaultFolder;
+    // 보고 있는 폴더에 새 문구를 넣는다. "전체"에서는 아무 폴더도 고르지 않는다.
+    renderFolderChecks(state.currentFolder === "all" ? [] : [state.currentFolder]);
   }
 
   setEditorMessage("");
@@ -765,6 +1021,32 @@ function openEditor(phrase) {
   editorOverlay.hidden = false;
   render();
   editorTitle.focus();
+}
+
+function renderFolderChecks(checkedIds) {
+  if (!state.folders.length) {
+    editorFolders.replaceChildren(
+      element("span", "folder-checks-empty", "폴더가 없습니다. 탭 옆 + 로 만들 수 있습니다."),
+    );
+    return;
+  }
+
+  const checks = state.folders.map((folder) => {
+    const label = element("label", "folder-check");
+    const checkbox = element("input");
+    checkbox.type = "checkbox";
+    checkbox.value = folder.id;
+    checkbox.checked = checkedIds.includes(folder.id);
+    label.classList.toggle("is-checked", checkbox.checked);
+    checkbox.addEventListener("change", () => label.classList.toggle("is-checked", checkbox.checked));
+    label.append(checkbox, folder.name);
+    return label;
+  });
+  editorFolders.replaceChildren(...checks);
+}
+
+function checkedFolderIds() {
+  return [...editorFolders.querySelectorAll("input:checked")].map((checkbox) => checkbox.value);
 }
 
 function closeEditor() {
@@ -791,36 +1073,53 @@ async function saveEditor() {
     (title ? editorText : editorTitle).focus();
     return;
   }
-  const folderId = editorFolder.value || null;
+  const folderIds = checkedFolderIds();
+  const isNew = current.mode === "new";
 
   editorSave.disabled = true;
   let saved;
-  if (current.mode === "edit") {
-    saved = await updatePhrase(current.id, { title, text, folder_id: folderId });
-  } else {
+  if (isNew) {
     const top = state.phrases.length ? state.phrases[0].sort_order - 1 : 1;
-    saved = await insertPhrase({ title, text, folder_id: folderId, sort_order: top });
+    saved = await insertPhrase({ title, text, sort_order: top });
+  } else {
+    saved = await updatePhrase(current.id, { title, text });
   }
-  editorSave.disabled = false;
-
   if (!saved) {
+    editorSave.disabled = false;
     if (editor === current) {
       setEditorMessage(SAVE_ERROR_MESSAGE);
     }
     return;
   }
 
-  if (current.mode === "edit") {
-    state.phrases = state.phrases.map((p) => (p.id === saved.id ? saved : p));
-  } else {
+  if (isNew) {
     state.phrases = [saved, ...state.phrases];
     state.selectedId = saved.id;
+    // 폴더 저장이 실패해 다시 누르면 문구를 또 만들지 않고 이 문구를 고치게 한다.
+    current.mode = "edit";
+    current.id = saved.id;
+  } else {
+    state.phrases = state.phrases.map((p) => (p.id === saved.id ? saved : p));
   }
+
+  const foldersSaved = await setPhraseFolders(saved.id, saved.folder_ids, folderIds);
+  editorSave.disabled = false;
+  if (foldersSaved) {
+    state.phrases = state.phrases.map((p) => (p.id === saved.id ? { ...p, folder_ids: folderIds } : p));
+  }
+  render();
+
+  if (!foldersSaved) {
+    if (editor === current) {
+      setEditorMessage("문구는 저장했지만 폴더를 저장하지 못했습니다. 다시 저장해 주세요.");
+    }
+    return;
+  }
+
   if (editor === current) {
     closeEditor();
   }
-  render();
-  showToast(current.mode === "edit" ? "수정했습니다" : "등록했습니다");
+  showToast(isNew ? "등록했습니다" : "수정했습니다");
 }
 
 /* ---------- 화면 전환 ---------- */
@@ -870,6 +1169,7 @@ function showLogin() {
   loginView.hidden = false;
 
   closeEditor();
+  closeFolderDelete();
   toast.hidden = true;
   Object.assign(state, {
     phrases: [],
@@ -879,6 +1179,7 @@ function showLogin() {
     copiedId: null,
     confirmDelete: null,
     addingFolder: false,
+    renamingFolderId: null,
   });
   render();
 
@@ -932,12 +1233,27 @@ editorOverlay.addEventListener("mousedown", (event) => {
 
 editorTextField.after(createDateToolbar(editorText));
 
+folderDeleteOnly.addEventListener("click", () => deleteFolder(false));
+folderDeleteWithPhrases.addEventListener("click", () => deleteFolder(true));
+folderDeleteCancel.addEventListener("click", closeFolderDelete);
+folderDeleteOverlay.addEventListener("mousedown", (event) => {
+  if (event.target === folderDeleteOverlay && !folderDeleteCancel.disabled) {
+    closeFolderDelete();
+  }
+});
+
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && deletingFolder) {
+    if (!folderDeleteCancel.disabled) {
+      closeFolderDelete();
+    }
+    return;
+  }
   if (event.key === "Escape" && editor) {
     closeEditor();
     return;
   }
-  if (editor || appView.hidden || state.listStatus !== "ready" || isTyping()) {
+  if (editor || deletingFolder || appView.hidden || state.listStatus !== "ready" || isTyping()) {
     return;
   }
   if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) {
