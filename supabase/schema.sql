@@ -1,11 +1,51 @@
--- Supabase 대시보드의 SQL Editor에서 한 번만 실행한다.
+-- 새 Supabase 프로젝트의 SQL Editor에서 한 번만 실행한다.
+-- 이미 예전 schema.sql을 실행한 프로젝트는 대신 migration-folders.sql을 실행한다.
+
+-- 빈 폴더도 유지해야 하므로 별도 테이블로 둔다.
+create table public.folders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  name text not null check (char_length(trim(name)) > 0),
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  unique (user_id, name)
+);
+
+alter table public.folders enable row level security;
+
+revoke all on public.folders from anon, authenticated;
+grant select, insert, update, delete on public.folders to authenticated;
+
+create policy "본인 폴더 조회" on public.folders
+  for select to authenticated
+  using ((select auth.uid()) = user_id);
+
+create policy "본인 폴더 등록" on public.folders
+  for insert to authenticated
+  with check ((select auth.uid()) = user_id);
+
+create policy "본인 폴더 수정" on public.folders
+  for update to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
+
+create policy "본인 폴더 삭제" on public.folders
+  for delete to authenticated
+  using ((select auth.uid()) = user_id);
+
 create table public.phrases (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   title text not null default '',
   text text not null check (char_length(trim(text)) > 0),
+  -- 폴더를 지우면 문구는 남고 "전체"에서만 보인다.
+  folder_id uuid references public.folders (id) on delete set null,
+  -- 작을수록 위에 보인다. 끌어서 옮길 때 앞뒤 값의 중간값을 쓰므로 실수형이다.
+  sort_order double precision not null default 0,
   created_at timestamptz not null default now()
 );
+
+create index phrases_user_sort_idx on public.phrases (user_id, sort_order);
 
 alter table public.phrases enable row level security;
 

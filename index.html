@@ -3,22 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>QA 툴</title>
+  <title>QA tool</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="site-header">
-    <h1>QA 툴</h1>
-    <button type="button" id="logout-button" hidden>로그아웃</button>
+    <div class="site-header-inner">
+      <div class="logo">
+        <span class="logo-mark">QA</span>
+        <span class="logo-text">QA tool</span>
+      </div>
+      <nav id="tool-nav" class="tool-nav" hidden>
+        <span class="tool-link is-active" aria-current="page">문구 보관함</span>
+        <span class="tool-link is-disabled">사용량 분석기<span class="tool-badge">준비 중</span></span>
+      </nav>
+      <div id="account" class="account" hidden>
+        <span id="account-email" class="account-email"></span>
+        <button type="button" id="logout-button" class="logout-button">로그아웃</button>
+      </div>
+    </div>
   </header>
 
-  <main id="login-view" class="container" hidden>
+  <main id="login-view" class="page page-login" hidden>
     <section class="card">
       <h2>로그인</h2>
       <form id="login-form" class="login-form">
-        <label for="login-email">이메일</label>
+        <label for="login-email" class="field-label">이메일</label>
         <input id="login-email" type="email" autocomplete="username" required>
-        <label for="login-password">비밀번호</label>
+        <label for="login-password" class="field-label">비밀번호</label>
         <input id="login-password" type="password" autocomplete="current-password" required>
         <div class="form-footer">
           <p id="login-message" class="message" role="status"></p>
@@ -28,27 +41,50 @@
     </section>
   </main>
 
-  <main id="app-view" class="container" hidden>
-    <section class="card">
-      <h2>문구 등록</h2>
-      <form id="phrase-form">
-        <label for="phrase-title" class="field-label">제목</label>
-        <input id="phrase-title" type="text" maxlength="100" placeholder="목록에 보일 제목을 입력하세요">
-        <label for="phrase-input" class="field-label">내용</label>
-        <textarea id="phrase-input" rows="4" placeholder="자주 쓰는 문구를 입력하세요"></textarea>
-        <div class="form-footer">
-          <p id="form-message" class="message" role="status"></p>
-          <button type="submit" class="button-primary">등록</button>
-        </div>
-      </form>
-    </section>
+  <main id="app-view" class="page" hidden>
+    <section class="library">
+      <div class="library-header">
+        <div id="folder-tabs" class="folder-tabs"></div>
+        <button type="button" id="new-phrase-button" class="new-phrase-button">+ 새 문구</button>
+      </div>
 
-    <section>
-      <h2>등록된 문구</h2>
-      <p id="list-message" class="empty" role="status"></p>
+      <div class="shortcuts">
+        <span class="shortcut"><kbd>1–9</kbd>바로 복사</span>
+        <span class="shortcut"><kbd>↑ ↓</kbd>선택</span>
+        <span class="shortcut"><kbd>Enter</kbd>선택 문구 복사</span>
+        <span class="shortcut"><kbd>N</kbd>새 문구</span>
+        <span class="shortcut"><kbd>⋮⋮</kbd>끌어서 순서 변경 · 탭 위에 놓으면 폴더 이동</span>
+      </div>
+
+      <p id="list-message" class="empty" role="status" hidden></p>
       <ul id="phrase-list" class="phrase-list"></ul>
     </section>
   </main>
+
+  <div id="editor-overlay" class="modal-overlay" hidden>
+    <form id="editor-form" class="modal" role="dialog" aria-modal="true" aria-labelledby="editor-heading" novalidate>
+      <h2 id="editor-heading" class="modal-title">새 문구</h2>
+      <div class="modal-grid">
+        <label class="field">제목
+          <input id="editor-title" type="text" maxlength="100" placeholder="목록에 보일 제목">
+        </label>
+        <label class="field">폴더
+          <select id="editor-folder"></select>
+        </label>
+      </div>
+      <label id="editor-text-field" class="field">내용
+        <textarea id="editor-text" rows="6" placeholder="자주 쓰는 문구를 입력하세요"></textarea>
+      </label>
+      <div class="modal-footer">
+        <p id="editor-message" class="modal-message" role="status" hidden></p>
+        <span id="editor-hint" class="modal-hint">Ctrl+Enter 저장 · Esc 닫기</span>
+        <button type="submit" id="editor-save" class="button-primary modal-save">저장</button>
+        <button type="button" id="editor-cancel" class="button-secondary modal-cancel">취소</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="toast" class="toast" role="status" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.min.js" integrity="sha384-UagCvVPT5XXA0Hx+nJYUAGBFseHT9zBgpJMSebsAxl9lciTwbT+39j5VfRjdP5Tp" crossorigin="anonymous"></script>
   <script src="app.js"></script>
