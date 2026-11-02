@@ -12,7 +12,8 @@ const EMPTY_LIST_MESSAGE = "아직 등록된 문구가 없습니다.";
 const EMPTY_FOLDER_MESSAGE = "이 폴더에 문구가 없습니다.";
 const LOADING_MESSAGE = "문구를 불러오는 중입니다.";
 const LOAD_ERROR_MESSAGE = "문구를 불러오지 못했습니다. 새로고침해 주세요.";
-const DATE_CHECK_MS = 60000;
+// 시간 변수가 분 단위라 분이 바뀐 걸 늦지 않게 알아차리도록 자주 확인한다.
+const DATE_CHECK_MS = 10000;
 const DOUBLE_CLICK_MS = 400;
 // 중간값으로 끼워 넣다가 간격이 이보다 좁아지면 전체 순서를 다시 매긴다.
 const MIN_SORT_GAP = 1e-6;
@@ -38,7 +39,11 @@ const DATE_BASES = [
 ];
 
 // 캡처 그룹이 하나뿐이라 split 결과의 홀수 번째 항목이 변수가 된다.
-const DATE_VARIABLE_PATTERN = /(\{(?:내일 |다음주 월요일 )?(?:YYYY-MM-DD|YYYY\.MM\.DD|MM\/DD|M월 D일)\})/;
+// 지금으로부터 몇 시간 뒤의 시각이다. 자정을 넘기면 다음 날 시각이 되며 날짜는 붙지 않는다.
+const TIME_OFFSET_HOURS = 2;
+const TIME_TOKEN = "{2시간 뒤 HH시 mm분}";
+const DATE_VARIABLE_PATTERN =
+  /(\{(?:(?:내일 |다음주 월요일 )?(?:YYYY-MM-DD|YYYY\.MM\.DD|MM\/DD|M월 D일)|2시간 뒤 HH시 mm분)\})/;
 
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
@@ -77,6 +82,7 @@ const folderDeleteCancel = document.getElementById("folder-delete-cancel");
 const toast = document.getElementById("toast");
 
 let shownDate = dateKey();
+let shownTime = timeKey();
 // undefined는 아직 로그인 상태를 확인하지 못했다는 뜻이다.
 let currentUserId;
 
@@ -262,7 +268,16 @@ function dateKey() {
   return DATE_FORMATS["YYYY-MM-DD"](new Date());
 }
 
+function timeKey() {
+  const now = new Date();
+  return `${dateKey()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
 function formatDateVariable(token, date) {
+  if (token === TIME_TOKEN) {
+    const later = new Date(date.getTime() + TIME_OFFSET_HOURS * 60 * 60 * 1000);
+    return `${pad(later.getHours())}시 ${pad(later.getMinutes())}분`;
+  }
   const inner = token.slice(1, -1);
   const base = DATE_BASES.find((b) => b.prefix && inner.startsWith(b.prefix)) || DATE_BASES[0];
   return DATE_FORMATS[inner.slice(base.prefix.length)](base.resolve(date));
@@ -276,17 +291,45 @@ function applyDateVariables(template, date) {
 }
 
 function refreshDates() {
-  if (dateKey() === shownDate) {
+  if (timeKey() === shownTime) {
     return;
   }
+  shownTime = timeKey();
+  const dateChanged = dateKey() !== shownDate;
   shownDate = dateKey();
 
   const date = new Date();
   document.querySelectorAll(".date-button").forEach((button) => {
     button.textContent = formatDateVariable(button.dataset.token, date);
   });
-  // 미리보기도 오늘 날짜 기준으로 다시 그린다.
-  render();
+  // 미리보기도 지금 기준으로 다시 그린다. 시간 변수는 분마다 바뀌므로 그 문구가 있을 때만 매분 그린다.
+  if (dateChanged || state.phrases.some((phrase) => phrase.text.includes(TIME_TOKEN))) {
+    render();
+  }
+}
+
+function createVariableButton(token, textarea, date) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "date-button";
+  button.dataset.token = token;
+  button.title = token;
+  button.textContent = formatDateVariable(token, date);
+  button.addEventListener("click", () => {
+    textarea.setRangeText(token, textarea.selectionStart, textarea.selectionEnd, "end");
+    textarea.focus();
+  });
+  return button;
+}
+
+function createVariableRow(labelText, buttons) {
+  const row = document.createElement("div");
+  row.className = "date-row";
+  const label = document.createElement("span");
+  label.className = "date-label";
+  label.textContent = labelText;
+  row.append(label, ...buttons);
+  return row;
 }
 
 function createDateToolbar(textarea) {
@@ -295,36 +338,17 @@ function createDateToolbar(textarea) {
 
   const heading = document.createElement("div");
   heading.className = "date-toolbar-heading";
-  heading.textContent = "날짜 넣기 · 복사할 때 실제 날짜로 바뀝니다";
+  heading.textContent = "날짜·시간 넣기 · 복사할 때 실제 값으로 바뀝니다";
   toolbar.append(heading);
 
   const date = new Date();
   DATE_BASES.forEach((base) => {
-    const row = document.createElement("div");
-    row.className = "date-row";
-
-    const label = document.createElement("span");
-    label.className = "date-label";
-    label.textContent = base.label;
-    row.append(label);
-
-    Object.keys(DATE_FORMATS).forEach((format) => {
-      const token = `{${base.prefix}${format}}`;
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "date-button";
-      button.dataset.token = token;
-      button.title = token;
-      button.textContent = formatDateVariable(token, date);
-      button.addEventListener("click", () => {
-        textarea.setRangeText(token, textarea.selectionStart, textarea.selectionEnd, "end");
-        textarea.focus();
-      });
-      row.append(button);
-    });
-
-    toolbar.append(row);
+    const buttons = Object.keys(DATE_FORMATS).map((format) =>
+      createVariableButton(`{${base.prefix}${format}}`, textarea, date),
+    );
+    toolbar.append(createVariableRow(base.label, buttons));
   });
+  toolbar.append(createVariableRow(`${TIME_OFFSET_HOURS}시간 뒤`, [createVariableButton(TIME_TOKEN, textarea, date)]));
 
   return toolbar;
 }
