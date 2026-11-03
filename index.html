@@ -15,8 +15,8 @@
         <span class="logo-text">QA tool</span>
       </div>
       <nav id="tool-nav" class="tool-nav" hidden>
-        <span class="tool-link is-active" aria-current="page">문구 보관함</span>
-        <span class="tool-link is-disabled">사용량 분석기<span class="tool-badge">준비 중</span></span>
+        <button type="button" class="tool-link" data-tool="phrases">문구 보관함</button>
+        <button type="button" class="tool-link" data-tool="deploy">별도배포확인</button>
       </nav>
       <div id="account" class="account" hidden>
         <span id="account-email" class="account-email"></span>
@@ -61,6 +61,48 @@
     </section>
   </main>
 
+  <main id="deploy-view" class="page" hidden>
+    <section class="library">
+      <div class="library-header">
+        <div id="deploy-tabs" class="folder-tabs"></div>
+      </div>
+      <p id="deploy-progress" class="deploy-progress" hidden></p>
+      <p id="deploy-message" class="empty" role="status" hidden></p>
+      <div id="deploy-grid" class="deploy-grid" hidden>
+        <div class="deploy-scroll">
+          <table class="deploy-table">
+            <colgroup>
+              <col class="col-handle">
+              <col class="col-qc">
+              <col class="col-job">
+              <col class="col-dev">
+              <col class="col-types">
+              <col>
+              <col class="col-check">
+              <col class="col-check">
+              <col class="col-delete">
+            </colgroup>
+            <thead>
+              <tr>
+                <th></th>
+                <th>QC</th>
+                <th>잡코드</th>
+                <th>개발자</th>
+                <th>파일유형</th>
+                <th>특이사항</th>
+                <th class="is-center">푸시</th>
+                <th class="is-center">QC확인</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="deploy-rows"></tbody>
+          </table>
+        </div>
+        <button type="button" id="deploy-add-row" class="deploy-add-row">+ 새 행</button>
+      </div>
+    </section>
+  </main>
+
   <div id="editor-overlay" class="modal-overlay" hidden>
     <form id="editor-form" class="modal" role="dialog" aria-modal="true" aria-labelledby="editor-heading" novalidate>
       <h2 id="editor-heading" class="modal-title">새 문구</h2>
@@ -96,9 +138,22 @@
     </div>
   </div>
 
+  <div id="deploy-folder-delete-overlay" class="modal-overlay" hidden>
+    <div class="modal modal-small" role="alertdialog" aria-modal="true" aria-labelledby="deploy-folder-delete-heading" aria-describedby="deploy-folder-delete-body">
+      <h2 id="deploy-folder-delete-heading" class="modal-title"></h2>
+      <div id="deploy-folder-delete-body" class="modal-body"></div>
+      <div class="modal-footer">
+        <p id="deploy-folder-delete-message" class="modal-message" role="status" hidden></p>
+        <button type="button" id="deploy-folder-delete-confirm" class="button-danger modal-danger modal-save">삭제</button>
+        <button type="button" id="deploy-folder-delete-cancel" class="button-secondary modal-cancel">취소</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast" role="status" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.min.js" integrity="sha384-UagCvVPT5XXA0Hx+nJYUAGBFseHT9zBgpJMSebsAxl9lciTwbT+39j5VfRjdP5Tp" crossorigin="anonymous"></script>
   <script src="app.js"></script>
+  <script src="deploy.js"></script>
 </body>
 </html>

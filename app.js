@@ -4,6 +4,8 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_VSwsbTaZvwRHuUv3yKIQoQ_SHZxMwkD
 
 const LEGACY_STORAGE_KEY = "qa-tool.phrases";
 const FOLDER_STORAGE_KEY = "qa-tool.current-folder";
+const TOOL_STORAGE_KEY = "qa-tool.current-tool";
+const TOOLS = ["phrases", "deploy"];
 const COPY_FEEDBACK_MS = 1500;
 const TOAST_MS = 1500;
 const SAVE_ERROR_MESSAGE = "저장하지 못했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.";
@@ -57,6 +59,8 @@ const account = document.getElementById("account");
 const accountEmail = document.getElementById("account-email");
 const logoutButton = document.getElementById("logout-button");
 const appView = document.getElementById("app-view");
+const deployView = document.getElementById("deploy-view");
+const toolLinks = [...toolNav.querySelectorAll(".tool-link")];
 const folderTabs = document.getElementById("folder-tabs");
 const newPhraseButton = document.getElementById("new-phrase-button");
 const listMessage = document.getElementById("list-message");
@@ -409,6 +413,34 @@ function showToast(text) {
   toastTimer = setTimeout(() => {
     toast.hidden = true;
   }, TOAST_MS);
+}
+
+function readStoredTool() {
+  try {
+    const tool = localStorage.getItem(TOOL_STORAGE_KEY);
+    return TOOLS.includes(tool) ? tool : "phrases";
+  } catch {
+    return "phrases";
+  }
+}
+
+function setTool(tool) {
+  appView.hidden = tool !== "phrases";
+  deployView.hidden = tool !== "deploy";
+  toolLinks.forEach((link) => {
+    const isActive = link.dataset.tool === tool;
+    link.classList.toggle("is-active", isActive);
+    if (isActive) {
+      link.setAttribute("aria-current", "page");
+    } else {
+      link.removeAttribute("aria-current");
+    }
+  });
+  try {
+    localStorage.setItem(TOOL_STORAGE_KEY, tool);
+  } catch {
+    // 저장하지 못해도 이번 화면에서는 동작한다.
+  }
 }
 
 function readStoredFolder() {
@@ -1150,7 +1182,7 @@ async function saveEditor() {
 
 async function showApp(email) {
   loginView.hidden = true;
-  appView.hidden = false;
+  setTool(readStoredTool());
   toolNav.hidden = false;
   account.hidden = false;
   accountEmail.textContent = email || "";
@@ -1163,6 +1195,7 @@ async function showApp(email) {
   render();
 
   const userId = currentUserId;
+  loadDeploy(userId);
   await importLegacyPhrases();
   try {
     const [phrases, folders] = await Promise.all([fetchPhrases(), fetchFolders()]);
@@ -1187,6 +1220,8 @@ async function showApp(email) {
 
 function showLogin() {
   appView.hidden = true;
+  deployView.hidden = true;
+  resetDeploy();
   toolNav.hidden = true;
   account.hidden = true;
   accountEmail.textContent = "";
@@ -1232,6 +1267,8 @@ loginForm.addEventListener("submit", async (event) => {
 logoutButton.addEventListener("click", () => {
   client.auth.signOut();
 });
+
+toolLinks.forEach((link) => link.addEventListener("click", () => setTool(link.dataset.tool)));
 
 newPhraseButton.addEventListener("click", () => openEditor(null));
 

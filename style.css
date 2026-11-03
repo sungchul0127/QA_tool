@@ -198,29 +198,25 @@ select:focus {
 .tool-link {
   display: flex;
   align-items: center;
-  gap: 6px;
   height: 32px;
   padding: 0 12px;
+  border: none;
   border-radius: 8px;
+  background: transparent;
+  color: var(--text-3);
   font-size: 14px;
   white-space: nowrap;
 }
 
+.tool-link:hover {
+  background: var(--fill-hover);
+  color: var(--text);
+}
+
 .tool-link.is-active {
   background: var(--fill-active);
+  color: var(--text);
   font-weight: 600;
-}
-
-.tool-link.is-disabled {
-  color: var(--text-faint);
-}
-
-.tool-badge {
-  padding: 1px 6px;
-  border-radius: 5px;
-  background: var(--fill-active);
-  color: var(--text-muted);
-  font-size: 11px;
 }
 
 .account {
@@ -903,6 +899,232 @@ select:focus {
   background: #9c3925;
 }
 
+/* 별도배포확인 */
+.deploy-progress {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.deploy-progress strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.deploy-grid {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.deploy-scroll {
+  overflow-x: auto;
+}
+
+.deploy-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 14px;
+}
+
+.col-handle {
+  width: 28px;
+}
+
+.col-qc,
+.col-dev {
+  width: 92px;
+}
+
+.col-job {
+  width: 130px;
+}
+
+.col-types {
+  width: 150px;
+}
+
+.col-check {
+  width: 64px;
+}
+
+.col-delete {
+  width: 52px;
+}
+
+.deploy-table th {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-sunken);
+  color: var(--text-3);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.deploy-table th + th,
+.deploy-table td + td {
+  border-left: 1px solid var(--fill-active);
+}
+
+.deploy-table td {
+  height: 40px;
+  padding: 0;
+  border-bottom: 1px solid var(--fill-active);
+  vertical-align: middle;
+}
+
+.deploy-table .is-center {
+  text-align: center;
+}
+
+.deploy-row.is-done td {
+  background: var(--surface-sunken);
+}
+
+.deploy-row.is-done .deploy-input {
+  color: var(--text-faint);
+}
+
+.deploy-row.is-dragging {
+  opacity: 0.45;
+}
+
+.deploy-row.is-drop-before td {
+  box-shadow: inset 0 3px 0 0 var(--accent);
+}
+
+.deploy-row.is-drop-after td {
+  box-shadow: inset 0 -3px 0 0 var(--accent);
+}
+
+.deploy-handle-cell {
+  text-align: center;
+}
+
+.deploy-handle-cell .drag-handle {
+  padding: 0 2px;
+  font-size: 13px;
+}
+
+/* 표 칸 안에서는 테두리 없이 글자만 보이다가, 고칠 때 칸 테두리가 강조된다. */
+.deploy-table .deploy-input {
+  height: 40px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  text-overflow: ellipsis;
+}
+
+.deploy-table .deploy-input::placeholder {
+  color: var(--handle);
+}
+
+.deploy-table .deploy-input:hover {
+  background: var(--bg);
+}
+
+.deploy-table .deploy-input:focus {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.deploy-chips {
+  display: flex;
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.deploy-chip {
+  height: 24px;
+  padding: 0 7px;
+  border: 1px solid var(--line-input);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.deploy-chip:hover {
+  border-color: var(--line-hover);
+  color: var(--text);
+}
+
+.deploy-chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.deploy-table .deploy-check {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.deploy-table .deploy-check:focus {
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.deploy-row-delete {
+  height: 26px;
+  min-width: 26px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0;
+}
+
+.deploy-row:hover .deploy-row-delete,
+.deploy-row-delete:focus,
+.deploy-row-delete.is-confirming {
+  opacity: 1;
+}
+
+.deploy-row-delete:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.deploy-row-delete.is-confirming {
+  background: var(--danger);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.deploy-add-row {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.deploy-add-row:hover:not(:disabled) {
+  background: var(--surface-sunken);
+  color: var(--text);
+}
+
 /* 토스트 */
 .toast {
   position: fixed;
@@ -945,8 +1167,8 @@ select:focus {
     padding: 0 16px;
   }
 
-  .tool-link.is-disabled {
-    display: none;
+  .tool-link {
+    padding: 0 8px;
   }
 
   .page {
@@ -968,5 +1190,12 @@ select:focus {
   .phrase-actions,
   .delete-confirm {
     margin-left: auto;
+  }
+}
+
+/* 마우스를 올릴 수 없는 기기에서는 행 삭제 버튼을 늘 보여 준다. */
+@media (hover: none) {
+  .deploy-row-delete {
+    opacity: 1;
   }
 }
