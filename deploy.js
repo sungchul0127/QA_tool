@@ -116,6 +116,11 @@ function patchItem(id, changes) {
   deploy.items = deploy.items.map((item) => (item.id === id ? { ...item, ...changes } : item));
 }
 
+// 빈 행이 섞여 있을 수 있어서, 잡코드가 적힌 행만 배포 건으로 센다.
+function countedItems(folderId) {
+  return folderItems(folderId).filter((item) => item.job_code);
+}
+
 function isDone(item) {
   return item.pushed && item.qc_checked;
 }
@@ -185,7 +190,7 @@ function createDeployTab(folder) {
 
   const label = button("folder-tab-button", undefined, () => clickDeployTab(folder.id));
   label.title = "더블클릭해서 이름 변경";
-  label.append(element("span", null, folder.name), element("span", "folder-count", String(folderItems(folder.id).length)));
+  label.append(element("span", null, folder.name), element("span", "folder-count", String(countedItems(folder.id).length)));
   node.append(label);
 
   if (isActive) {
@@ -220,7 +225,7 @@ function renderDeployBody() {
 }
 
 function renderDeployProgress() {
-  const items = deploy.currentFolder ? folderItems(deploy.currentFolder) : [];
+  const items = deploy.currentFolder ? countedItems(deploy.currentFolder) : [];
   deployProgress.hidden = !items.length;
   if (!items.length) {
     return;
@@ -381,6 +386,10 @@ function refreshRow(id) {
     input.title = item[input.dataset.field];
   });
   renderDeployProgress();
+  // 잡코드를 적거나 지우면 탭의 건수도 바뀐다. 폴더 이름을 입력하는 중이면 탭을 그대로 둔다.
+  if (!deploy.addingFolder && !deploy.renamingFolderId) {
+    renderDeployTabs();
+  }
 }
 
 function markDeployDropTarget(row, className) {
