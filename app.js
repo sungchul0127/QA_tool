@@ -42,7 +42,7 @@ const DATE_BASES = [
 ];
 
 // 캡처 그룹이 하나뿐이라 split 결과의 홀수 번째 항목이 변수가 된다.
-// 지금으로부터 몇 시간 뒤의 시각이다. 자정을 넘기면 다음 날 시각이 되며 날짜는 붙지 않는다.
+// 지금으로부터 몇 시간 뒤의 시각을 10분 단위로 올림한 값이다. 자정을 넘기면 다음 날 시각이 되며 날짜는 붙지 않는다.
 const TIME_OFFSET_HOURS = 2;
 const TIME_TOKEN = "{2시간 뒤 HH시 mm분}";
 const DATE_VARIABLE_PATTERN =
@@ -281,6 +281,8 @@ function timeKey() {
 function formatDateVariable(token, date) {
   if (token === TIME_TOKEN) {
     const later = new Date(date.getTime() + TIME_OFFSET_HOURS * 60 * 60 * 1000);
+    // 분은 10분 단위로 올림한다. 60분이 되면 setMinutes가 다음 시로 넘겨 준다.
+    later.setMinutes(Math.ceil(later.getMinutes() / 10) * 10);
     return `${pad(later.getHours())}시 ${pad(later.getMinutes())}분`;
   }
   const inner = token.slice(1, -1);
