@@ -1087,7 +1087,7 @@ select:focus {
 }
 
 .deploy-row.is-done .deploy-check {
-  accent-color: var(--text-faint);
+  accent-color: var(--line-hover);
 }
 
 .deploy-table .deploy-check:focus {
