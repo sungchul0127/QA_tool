@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- 헤더의 QA 로고(.logo-mark)와 같은 색과 모양이다. -->
+  <rect width="32" height="32" rx="9" fill="#1f1e1c"/>
+  <text x="16" y="21.5" text-anchor="middle" font-family="Pretendard, Arial, sans-serif" font-size="15" font-weight="700" fill="#fbfaf8">QA</text>
+</svg>
