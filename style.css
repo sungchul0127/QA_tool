@@ -1086,8 +1086,19 @@ select:focus {
   vertical-align: middle;
 }
 
+/* 기본 체크박스는 체크 표시 색을 바꿀 수 없어 직접 그린다.
+   상자는 파일유형 칩 테두리와 같은 회색, 체크는 칩 글자와 같은 #8d8880(--text-muted)이다. */
 .deploy-row.is-done .deploy-check {
-  accent-color: var(--line-hover);
+  appearance: none;
+  border: 1.5px solid var(--line-hover);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.deploy-row.is-done .deploy-check:checked {
+  background: var(--line-hover)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%238d8880' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 14px no-repeat;
 }
 
 .deploy-table .deploy-check:focus {
