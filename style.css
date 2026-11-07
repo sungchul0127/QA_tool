@@ -1086,6 +1086,10 @@ select:focus {
   vertical-align: middle;
 }
 
+.deploy-row.is-done .deploy-check {
+  accent-color: var(--text-faint);
+}
+
 .deploy-table .deploy-check:focus {
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
