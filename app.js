@@ -28,6 +28,7 @@ const DATE_FORMATS = {
   "YYYY-MM-DD": (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
   "YYYY.MM.DD": (d) => `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`,
   "MM/DD": (d) => `${pad(d.getMonth() + 1)}/${pad(d.getDate())}`,
+  MMDD: (d) => `${pad(d.getMonth() + 1)}${pad(d.getDate())}`,
   "M월 D일": (d) => `${d.getMonth() + 1}월 ${d.getDate()}일`,
 };
 
@@ -45,7 +46,7 @@ const DATE_BASES = [
 const TIME_OFFSET_HOURS = 2;
 const TIME_TOKEN = "{2시간 뒤 HH시 mm분}";
 const DATE_VARIABLE_PATTERN =
-  /(\{(?:(?:내일 |다음주 월요일 )?(?:YYYY-MM-DD|YYYY\.MM\.DD|MM\/DD|M월 D일)|2시간 뒤 HH시 mm분)\})/;
+  /(\{(?:(?:내일 |다음주 월요일 )?(?:YYYY-MM-DD|YYYY\.MM\.DD|MM\/DD|MMDD|M월 D일)|2시간 뒤 HH시 mm분)\})/;
 
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
