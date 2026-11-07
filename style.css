@@ -1063,6 +1063,18 @@ select:focus {
   font-weight: 600;
 }
 
+/* 완료된 행에서는 고른 파일유형도 초록 대신 다른 칸처럼 흐린 회색으로 보인다. */
+.deploy-row.is-done .deploy-chip {
+  background: transparent;
+  color: var(--text-faint);
+}
+
+.deploy-row.is-done .deploy-chip[aria-pressed="true"] {
+  border-color: var(--line-hover);
+  background: var(--fill-active);
+  color: var(--text-muted);
+}
+
 .deploy-table .deploy-check {
   display: inline-block;
   width: 18px;
