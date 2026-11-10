@@ -462,17 +462,62 @@ async function addDeployRow() {
   deploy.addingRow = true;
   deployAddRow.disabled = true;
 
+  // 완료되지 않은 마지막 행 바로 뒤, 즉 아래쪽 완료 행들 바로 위에 넣는다. 완료 행이 없으면 맨 아래.
   const items = folderItems(folderId);
-  const last = items[items.length - 1];
-  const saved = await insertDeployItem({ folder_id: folderId, sort_order: last ? last.sort_order + 1 : 1 });
+  let lastPending = -1;
+  items.forEach((item, i) => {
+    if (!isDone(item)) {
+      lastPending = i;
+    }
+  });
+  const before = items[lastPending];
+  const after = items[lastPending + 1];
+
+  let sortOrder;
+  let renumbered = [];
+  if (before && after) {
+    if (after.sort_order - before.sort_order < MIN_SORT_GAP) {
+      // 간격이 너무 좁으면 폴더 안 순서를 1, 2, 3...으로 다시 매기고 그 사이에 넣는다.
+      renumbered = items
+        .map((item, i) => ({ id: item.id, sort_order: i < lastPending + 1 ? i + 1 : i + 2 }))
+        .filter((change, i) => items[i].sort_order !== change.sort_order);
+      sortOrder = lastPending + 2;
+    } else {
+      sortOrder = (before.sort_order + after.sort_order) / 2;
+    }
+  } else if (before) {
+    sortOrder = before.sort_order + 1;
+  } else if (after) {
+    sortOrder = after.sort_order - 1;
+  } else {
+    sortOrder = 1;
+  }
+
+  const renumberResults = await Promise.all(
+    renumbered.map((change) => updateDeployItem(change.id, { sort_order: change.sort_order })),
+  );
+  const saved = renumberResults.every(Boolean)
+    ? await insertDeployItem({ folder_id: folderId, sort_order: sortOrder })
+    : null;
 
   deploy.addingRow = false;
   deployAddRow.disabled = false;
+  if (renumbered.length > 0) {
+    // 일부만 저장됐을 수 있으므로 성공 여부와 관계없이 화면 순서를 서버 기준에 맞춘다.
+    const newOrders = new Map(
+      renumbered.filter((_, i) => renumberResults[i]).map((change) => [change.id, change.sort_order]),
+    );
+    deploy.items = deploy.items.map((item) =>
+      newOrders.has(item.id) ? { ...item, sort_order: newOrders.get(item.id) } : item,
+    );
+  }
   if (!saved) {
+    deploy.items = sortItems(deploy.items);
+    renderDeploy();
     showToast(SAVE_ERROR_MESSAGE);
     return;
   }
-  deploy.items.push(saved);
+  deploy.items = sortItems([...deploy.items, saved]);
   renderDeploy();
   if (deploy.currentFolder === folderId) {
     const input = deployRows.querySelector(`tr[data-id="${saved.id}"] .deploy-input`);
