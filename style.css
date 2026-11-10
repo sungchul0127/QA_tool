@@ -1152,6 +1152,341 @@ select:focus {
   color: var(--text);
 }
 
+/* 배포 매뉴얼 */
+.manual-tools {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.manual-tool-button {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line-input);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.manual-tool-button:hover:not(:disabled) {
+  background: var(--fill-button-hover);
+  color: var(--text);
+}
+
+.manual-tool-button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.manual-tool-button.is-primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 600;
+}
+
+.manual-tool-button.is-primary:hover {
+  border-color: var(--primary-hover);
+  background: var(--primary-hover);
+  color: var(--on-primary);
+}
+
+.manual-tool-button.is-confirming {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.manual-tool-button.is-confirming:hover:not(:disabled) {
+  border-color: #9c3925;
+  background: #9c3925;
+  color: #ffffff;
+}
+
+.manual-banner {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--fill-hover);
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.manual-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.manual-stage {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.manual-stage.is-done {
+  background: var(--surface-sunken);
+}
+
+.manual-stage.is-dragging,
+.manual-sub.is-dragging {
+  opacity: 0.45;
+}
+
+.manual-stage.is-drop-before,
+.manual-sub.is-drop-before {
+  box-shadow: 0 -3px 0 0 var(--accent);
+}
+
+.manual-stage.is-drop-after,
+.manual-sub.is-drop-after {
+  box-shadow: 0 3px 0 0 var(--accent);
+}
+
+.manual-stage-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 14px 8px 8px;
+}
+
+.manual-stage-head.is-toggle {
+  cursor: pointer;
+}
+
+.manual-caret,
+.manual-caret-space {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.manual-caret {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+
+/* 아래를 가리키는 꺾쇠. 접으면 오른쪽을 가리킨다. */
+.manual-caret::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-top: -3px;
+  border-right: 1.75px solid currentColor;
+  border-bottom: 1.75px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.manual-caret:hover {
+  background: var(--fill-hover);
+  color: var(--text);
+}
+
+.manual-stage.is-collapsed .manual-caret {
+  transform: rotate(-90deg);
+}
+
+.manual-stage-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.manual-stage.is-done .manual-stage-title {
+  color: var(--text-faint);
+}
+
+.manual-count {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.manual-subs {
+  margin: 0;
+  padding: 4px 14px 8px 40px;
+  border-top: 1px solid var(--fill-active);
+  list-style: none;
+}
+
+.manual-sub {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.manual-sub .manual-check {
+  margin-top: 2px;
+}
+
+.manual-sub-text {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.manual-sub.is-done .manual-sub-text {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+
+.manual-stage-title.is-placeholder,
+.manual-sub-text.is-placeholder {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+.manual-check {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.manual-check:focus-visible {
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+/* 완료 표시는 별도배포확인의 완료 행 체크박스와 같은 회색으로 그린다. */
+.manual-stage.is-done .manual-check,
+.manual-sub.is-done .manual-check {
+  appearance: none;
+  border: 1.5px solid var(--line-hover);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.manual-stage.is-done .manual-check:checked,
+.manual-sub.is-done .manual-check:checked {
+  background: var(--line-hover)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%238d8880' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 14px no-repeat;
+}
+
+/* 편집 모드 */
+.manual-stage.is-editing .manual-stage-head {
+  padding-right: 8px;
+}
+
+.manual-stage.is-editing .manual-subs {
+  padding-left: 28px;
+  padding-right: 8px;
+}
+
+.manual-sub.is-editing {
+  align-items: center;
+  padding: 4px 0;
+  cursor: default;
+}
+
+.manual-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line-input);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.manual-input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.manual-stage-input {
+  font-weight: 600;
+}
+
+.manual-sub-input {
+  display: block;
+  overflow: hidden;
+  resize: none;
+}
+
+.manual-delete {
+  flex-shrink: 0;
+  height: 28px;
+  min-width: 28px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 15px;
+}
+
+.manual-delete:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.manual-delete.is-confirming {
+  background: var(--danger);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.manual-add-sub {
+  margin: 4px 0 0 22px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.manual-add-sub:hover {
+  background: var(--fill-hover);
+  color: var(--text);
+}
+
+.manual-add-stage {
+  padding: 12px;
+  border: 1px dashed var(--line-dashed);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
+
+.manual-add-stage:hover {
+  border-color: var(--line-hover);
+  background: var(--surface);
+  color: var(--text);
+}
+
 /* 토스트 */
 .toast {
   position: fixed;

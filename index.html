@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>QA tool</title>
-  <link rel="icon" href="favicon.svg?v=2026110705" type="image/svg+xml">
+  <link rel="icon" href="favicon.svg?v=2026111002" type="image/svg+xml">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
   <!-- 배포할 때마다 v 값을 바꾼다. 브라우저가 예전 css·js를 새 html과 섞어 쓰지 않게 한다. -->
-  <link rel="stylesheet" href="style.css?v=2026110705">
+  <link rel="stylesheet" href="style.css?v=2026111002">
 </head>
 <body>
   <header class="site-header">
@@ -19,6 +19,7 @@
       <nav id="tool-nav" class="tool-nav" hidden>
         <button type="button" class="tool-link" data-tool="phrases">문구 보관함</button>
         <button type="button" class="tool-link" data-tool="deploy">별도배포확인</button>
+        <button type="button" class="tool-link" data-tool="manual">배포 매뉴얼</button>
       </nav>
       <div id="account" class="account" hidden>
         <span id="account-email" class="account-email"></span>
@@ -105,6 +106,23 @@
     </section>
   </main>
 
+  <main id="manual-view" class="page" hidden>
+    <section class="library">
+      <div class="library-header">
+        <div id="manual-tabs" class="folder-tabs"></div>
+        <div id="manual-tools" class="manual-tools" hidden>
+          <button type="button" id="manual-reset" class="manual-tool-button">초기화</button>
+          <button type="button" id="manual-edit" class="manual-tool-button is-primary">편집</button>
+        </div>
+      </div>
+      <p id="manual-progress" class="deploy-progress" hidden></p>
+      <p id="manual-banner" class="manual-banner" hidden>편집 중 · ⋮⋮ 끌어서 순서 변경 · × 삭제 · 세부단계에서 Shift+Enter 줄바꿈</p>
+      <p id="manual-message" class="empty" role="status" hidden></p>
+      <ul id="manual-stages" class="manual-stages"></ul>
+      <button type="button" id="manual-add-stage" class="manual-add-stage" hidden>+ 큰 단계 추가</button>
+    </section>
+  </main>
+
   <div id="editor-overlay" class="modal-overlay" hidden>
     <form id="editor-form" class="modal" role="dialog" aria-modal="true" aria-labelledby="editor-heading" novalidate>
       <h2 id="editor-heading" class="modal-title">새 문구</h2>
@@ -152,10 +170,23 @@
     </div>
   </div>
 
+  <div id="manual-delete-overlay" class="modal-overlay" hidden>
+    <div class="modal modal-small" role="alertdialog" aria-modal="true" aria-labelledby="manual-delete-heading" aria-describedby="manual-delete-body">
+      <h2 id="manual-delete-heading" class="modal-title"></h2>
+      <div id="manual-delete-body" class="modal-body"></div>
+      <div class="modal-footer">
+        <p id="manual-delete-message" class="modal-message" role="status" hidden></p>
+        <button type="button" id="manual-delete-confirm" class="button-danger modal-danger modal-save">삭제</button>
+        <button type="button" id="manual-delete-cancel" class="button-secondary modal-cancel">취소</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast" role="status" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.min.js" integrity="sha384-UagCvVPT5XXA0Hx+nJYUAGBFseHT9zBgpJMSebsAxl9lciTwbT+39j5VfRjdP5Tp" crossorigin="anonymous"></script>
-  <script src="app.js?v=2026111001"></script>
-  <script src="deploy.js?v=2026111001"></script>
+  <script src="app.js?v=2026111002"></script>
+  <script src="deploy.js?v=2026111002"></script>
+  <script src="manual.js?v=2026111002"></script>
 </body>
 </html>

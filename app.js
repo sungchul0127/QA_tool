@@ -5,7 +5,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_VSwsbTaZvwRHuUv3yKIQoQ_SHZxMwkD
 const LEGACY_STORAGE_KEY = "qa-tool.phrases";
 const FOLDER_STORAGE_KEY = "qa-tool.current-folder";
 const TOOL_STORAGE_KEY = "qa-tool.current-tool";
-const TOOLS = ["phrases", "deploy"];
+const TOOLS = ["phrases", "deploy", "manual"];
 const COPY_FEEDBACK_MS = 1500;
 const TOAST_MS = 1500;
 const SAVE_ERROR_MESSAGE = "저장하지 못했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.";
@@ -61,6 +61,7 @@ const accountEmail = document.getElementById("account-email");
 const logoutButton = document.getElementById("logout-button");
 const appView = document.getElementById("app-view");
 const deployView = document.getElementById("deploy-view");
+const manualView = document.getElementById("manual-view");
 const toolLinks = [...toolNav.querySelectorAll(".tool-link")];
 const folderTabs = document.getElementById("folder-tabs");
 const newPhraseButton = document.getElementById("new-phrase-button");
@@ -430,6 +431,7 @@ function readStoredTool() {
 function setTool(tool) {
   appView.hidden = tool !== "phrases";
   deployView.hidden = tool !== "deploy";
+  manualView.hidden = tool !== "manual";
   toolLinks.forEach((link) => {
     const isActive = link.dataset.tool === tool;
     link.classList.toggle("is-active", isActive);
@@ -1199,6 +1201,7 @@ async function showApp(email) {
 
   const userId = currentUserId;
   loadDeploy(userId);
+  loadManual(userId);
   await importLegacyPhrases();
   try {
     const [phrases, folders] = await Promise.all([fetchPhrases(), fetchFolders()]);
@@ -1225,6 +1228,8 @@ function showLogin() {
   appView.hidden = true;
   deployView.hidden = true;
   resetDeploy();
+  manualView.hidden = true;
+  resetManual();
   toolNav.hidden = true;
   account.hidden = true;
   accountEmail.textContent = "";
