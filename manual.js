@@ -4,7 +4,7 @@
 
 const MANUAL_STORAGE_KEY = "qa-tool.manual";
 const MANUAL_COLLAPSED_STORAGE_KEY = "qa-tool.manual-collapsed";
-const MANUAL_COLUMNS = "id, name";
+const MANUAL_COLUMNS = "id, name, sort_order";
 const MANUAL_STEP_COLUMNS = "id, manual_id, parent_id, text, checked, sort_order";
 const STAGE_MAX_LENGTH = 200;
 const SUB_MAX_LENGTH = 500;
@@ -49,7 +49,11 @@ let manualCollapsed = readCollapsedStages();
 /* ---------- Supabase ---------- */
 
 async function fetchManuals() {
-  const { data, error } = await client.from("manuals").select(MANUAL_COLUMNS).order("created_at", { ascending: false });
+  const { data, error } = await client
+    .from("manuals")
+    .select(MANUAL_COLUMNS)
+    .order("sort_order")
+    .order("created_at", { ascending: false });
   if (error) {
     throw error;
   }
@@ -68,9 +72,18 @@ async function fetchManualSteps() {
   return data;
 }
 
-async function insertManual(name) {
-  const { data, error } = await client.from("manuals").insert({ name }).select(MANUAL_COLUMNS).single();
+async function insertManual(name, sortOrder) {
+  const { data, error } = await client
+    .from("manuals")
+    .insert({ name, sort_order: sortOrder })
+    .select(MANUAL_COLUMNS)
+    .single();
   return error ? null : data;
+}
+
+async function updateManualSortOrder(id, sortOrder) {
+  const { data, error } = await client.from("manuals").update({ sort_order: sortOrder }).eq("id", id).select("id");
+  return !error && data.length > 0;
 }
 
 // 성공하면 "ok", 같은 이름이 있으면 "duplicate", 그 밖의 실패는 "error"를 돌려준다.
@@ -267,7 +280,24 @@ function createManualTab(item) {
     deleteButton.setAttribute("aria-label", `'${item.name}' 매뉴얼 삭제`);
     node.append(deleteButton);
   }
+  makeTabDraggable(node, manualTabs, item.id, moveManualTab);
   return node;
+}
+
+function moveManualTab(dragId, targetId, after) {
+  const ids = movedTabOrder(manual.manuals.map((item) => item.id), dragId, targetId, after);
+  if (!ids) {
+    return;
+  }
+  reorderTabs(
+    manual.manuals,
+    ids,
+    (manuals) => {
+      manual.manuals = manuals;
+      renderManual();
+    },
+    updateManualSortOrder,
+  );
 }
 
 function renderManualBody() {
@@ -770,12 +800,14 @@ async function commitManualFolder(rawName) {
     showToast("같은 이름의 매뉴얼이 있습니다");
     return;
   }
-  const created = await insertManual(name);
+  // 새 매뉴얼은 맨 왼쪽에 온다.
+  const firstOrder = manual.manuals.reduce((min, m) => Math.min(min, m.sort_order), 1);
+  const created = await insertManual(name, firstOrder - 1);
   if (!created) {
     showToast("매뉴얼을 만들지 못했습니다");
     return;
   }
-  // 최신 매뉴얼이 맨 왼쪽에 온다. 새 매뉴얼은 바로 편집할 수 있게 연다.
+  // 새 매뉴얼은 바로 편집할 수 있게 연다.
   manual.manuals.unshift(created);
   setManual(created.id);
   manual.editing = true;

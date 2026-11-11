@@ -3,7 +3,7 @@
 
 const DEPLOY_FOLDER_STORAGE_KEY = "qa-tool.deploy-folder";
 const DEPLOY_ITEM_COLUMNS = "id, folder_id, qc, job_code, developer, file_types, note, pushed, qc_checked, sort_order";
-const DEPLOY_FOLDER_COLUMNS = "id, name";
+const DEPLOY_FOLDER_COLUMNS = "id, name, sort_order";
 const FILE_TYPES = ["3.0", "5.0", "5.6"];
 // 표에서 직접 고치는 글자 칸. 순서가 곧 표의 열 순서다.
 const DEPLOY_TEXT_FIELDS = [
@@ -48,6 +48,7 @@ async function fetchDeployFolders() {
   const { data, error } = await client
     .from("deploy_folders")
     .select(DEPLOY_FOLDER_COLUMNS)
+    .order("sort_order")
     .order("created_at", { ascending: false });
   if (error) {
     throw error;
@@ -82,9 +83,18 @@ async function deleteDeployItem(id) {
   return !error && data.length > 0;
 }
 
-async function insertDeployFolder(name) {
-  const { data, error } = await client.from("deploy_folders").insert({ name }).select(DEPLOY_FOLDER_COLUMNS).single();
+async function insertDeployFolder(name, sortOrder) {
+  const { data, error } = await client
+    .from("deploy_folders")
+    .insert({ name, sort_order: sortOrder })
+    .select(DEPLOY_FOLDER_COLUMNS)
+    .single();
   return error ? null : data;
+}
+
+async function updateDeployFolderSortOrder(id, sortOrder) {
+  const { data, error } = await client.from("deploy_folders").update({ sort_order: sortOrder }).eq("id", id).select("id");
+  return !error && data.length > 0;
 }
 
 // 성공하면 "ok", 같은 이름이 있으면 "duplicate", 그 밖의 실패는 "error"를 돌려준다.
@@ -199,7 +209,24 @@ function createDeployTab(folder) {
     deleteButton.setAttribute("aria-label", `'${folder.name}' 폴더 삭제`);
     node.append(deleteButton);
   }
+  makeTabDraggable(node, deployTabs, folder.id, moveDeployTab);
   return node;
+}
+
+function moveDeployTab(dragId, targetId, after) {
+  const ids = movedTabOrder(deploy.folders.map((folder) => folder.id), dragId, targetId, after);
+  if (!ids) {
+    return;
+  }
+  reorderTabs(
+    deploy.folders,
+    ids,
+    (folders) => {
+      deploy.folders = folders;
+      renderDeploy();
+    },
+    updateDeployFolderSortOrder,
+  );
 }
 
 function renderDeployBody() {
@@ -644,12 +671,13 @@ async function commitDeployFolder(rawName) {
     showToast("같은 이름의 폴더가 있습니다");
     return;
   }
-  const folder = await insertDeployFolder(name);
+  // 새 폴더는 맨 왼쪽에 온다.
+  const firstOrder = deploy.folders.reduce((min, f) => Math.min(min, f.sort_order), 1);
+  const folder = await insertDeployFolder(name, firstOrder - 1);
   if (!folder) {
     showToast("폴더를 만들지 못했습니다");
     return;
   }
-  // 최신 폴더가 맨 왼쪽에 온다.
   deploy.folders.unshift(folder);
   setDeployFolder(folder.id);
 }

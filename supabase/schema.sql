@@ -1,5 +1,5 @@
 -- 새 Supabase 프로젝트의 SQL Editor에서 한 번만 실행한다.
--- 이미 예전 schema.sql을 실행한 프로젝트는 대신 migration-folders.sql, migration-phrase-folders.sql, migration-deploy-check.sql, migration-deploy-manual.sql을 차례로 실행한다.
+-- 이미 예전 schema.sql을 실행한 프로젝트는 대신 migration-folders.sql, migration-phrase-folders.sql, migration-deploy-check.sql, migration-deploy-manual.sql, migration-tab-order.sql을 차례로 실행한다.
 
 -- 빈 폴더도 유지해야 하므로 별도 테이블로 둔다.
 create table public.folders (
@@ -103,6 +103,8 @@ create table public.deploy_folders (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   name text not null check (char_length(trim(name)) > 0),
+  -- 작을수록 왼쪽 탭에 보인다.
+  sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   unique (user_id, name)
 );
@@ -166,6 +168,8 @@ create table public.manuals (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   name text not null check (char_length(trim(name)) > 0),
+  -- 작을수록 왼쪽 탭에 보인다.
+  sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   unique (user_id, name)
 );

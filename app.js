@@ -224,6 +224,11 @@ async function renameFolderRow(id, name) {
   return data.length ? "ok" : "error";
 }
 
+async function updateFolderSortOrder(id, sortOrder) {
+  const { data, error } = await client.from("folders").update({ sort_order: sortOrder }).eq("id", id).select("id");
+  return !error && data.length > 0;
+}
+
 async function deleteFolderRow(id) {
   const { data, error } = await client.from("folders").delete().eq("id", id).select("id");
   return !error && data.length > 0;
@@ -556,6 +561,7 @@ function createFolderTab(tab) {
     deleteButton.setAttribute("aria-label", `'${tab.name}' 폴더 삭제`);
     node.append(deleteButton);
   }
+  makeTabDraggable(node, folderTabs, tab.key, moveFolderTab);
 
   node.addEventListener("dragover", (event) => {
     if (!drag) {
@@ -602,6 +608,93 @@ function createFolderInput(value, onCommit, onCancel) {
   });
   folderInput.addEventListener("blur", () => onCommit(folderInput.value));
   return folderInput;
+}
+
+/* ---------- 탭 끌어서 순서 바꾸기 (세 메뉴 공통) ---------- */
+
+// 끄는 중인 탭 { container, id }. 문구를 탭에 놓는 끌기(drag)와는 따로 둔다.
+let tabDrag = null;
+
+function clearTabDropMarks() {
+  document.querySelectorAll(".folder-tab.is-drop-before, .folder-tab.is-drop-after, .folder-tab.is-dragging").forEach((node) => {
+    node.classList.remove("is-drop-before", "is-drop-after", "is-dragging");
+  });
+}
+
+function endTabDrag() {
+  tabDrag = null;
+  clearTabDropMarks();
+}
+
+// 끄는 동안 탭을 다시 그려 원래 탭이 사라지면 dragend가 오지 않을 수 있다.
+document.addEventListener("dragend", () => tabDrag && endTabDrag());
+document.addEventListener("drop", () => tabDrag && endTabDrag());
+
+// 같은 탭 줄 안에서만 옮길 수 있다. 놓으면 onMove(끈 id, 대상 id, 대상 뒤인지)를 부른다.
+function makeTabDraggable(node, container, id, onMove) {
+  node.draggable = true;
+  node.addEventListener("dragstart", (event) => {
+    event.dataTransfer.effectAllowed = "move";
+    // 일부 브라우저는 데이터가 없으면 끌기를 시작하지 않는다.
+    event.dataTransfer.setData("text/plain", id);
+    tabDrag = { container, id };
+    requestAnimationFrame(() => node.classList.add("is-dragging"));
+  });
+  node.addEventListener("dragover", (event) => {
+    if (!tabDrag || tabDrag.container !== container || tabDrag.id === id) {
+      return;
+    }
+    event.preventDefault();
+    const rect = node.getBoundingClientRect();
+    const after = event.clientX > rect.left + rect.width / 2;
+    if (!node.classList.contains(after ? "is-drop-after" : "is-drop-before")) {
+      container.querySelectorAll(".is-drop-before, .is-drop-after").forEach((other) => {
+        other.classList.remove("is-drop-before", "is-drop-after");
+      });
+      node.classList.add(after ? "is-drop-after" : "is-drop-before");
+    }
+  });
+  node.addEventListener("dragleave", (event) => {
+    if (!node.contains(event.relatedTarget)) {
+      node.classList.remove("is-drop-before", "is-drop-after");
+    }
+  });
+  node.addEventListener("drop", (event) => {
+    if (!tabDrag || tabDrag.container !== container || tabDrag.id === id) {
+      return;
+    }
+    event.preventDefault();
+    const after = node.classList.contains("is-drop-after");
+    const dragId = tabDrag.id;
+    endTabDrag();
+    onMove(dragId, id, after);
+  });
+  node.addEventListener("dragend", endTabDrag);
+}
+
+// 옮긴 뒤의 id 순서. 순서가 그대로면 null을 돌려준다.
+function movedTabOrder(ids, dragId, targetId, after) {
+  const rest = ids.filter((id) => id !== dragId);
+  const target = rest.indexOf(targetId);
+  if (target < 0 || rest.length === ids.length) {
+    return null;
+  }
+  rest.splice(target + (after ? 1 : 0), 0, dragId);
+  return rest.every((id, i) => id === ids[i]) ? null : rest;
+}
+
+// 탭은 몇 개 안 되므로 옮길 때마다 1부터 다시 매기고, 값이 바뀐 탭만 저장한다.
+// items를 새 순서로 바꿔 돌려주고, 저장에 실패하면 원래 items로 되돌릴 수 있게 한다.
+async function reorderTabs(items, orderedIds, apply, update) {
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const next = orderedIds.map((id, i) => ({ ...byId.get(id), sort_order: i + 1 }));
+  const changes = next.filter((item) => byId.get(item.id).sort_order !== item.sort_order);
+  apply(next);
+  const results = await Promise.all(changes.map((item) => update(item.id, item.sort_order)));
+  if (!results.every(Boolean)) {
+    apply(items);
+    showToast(SAVE_ERROR_MESSAGE);
+  }
 }
 
 function renderList() {
@@ -888,6 +981,22 @@ async function commitRename(folderId, rawName) {
     render();
     showToast(result === "duplicate" ? "같은 이름의 폴더가 있습니다" : SAVE_ERROR_MESSAGE);
   }
+}
+
+function moveFolderTab(dragId, targetId, after) {
+  const ids = movedTabOrder(state.folders.map((folder) => folder.id), dragId, targetId, after);
+  if (!ids) {
+    return;
+  }
+  reorderTabs(
+    state.folders,
+    ids,
+    (folders) => {
+      state.folders = folders;
+      render();
+    },
+    updateFolderSortOrder,
+  );
 }
 
 // 탭 위에 놓으면 원래 폴더는 그대로 두고 그 폴더에도 넣는다.
