@@ -437,6 +437,8 @@ function setTool(tool) {
   appView.hidden = tool !== "phrases";
   deployView.hidden = tool !== "deploy";
   manualView.hidden = tool !== "manual";
+  // 숨겨져 있는 동안 그린 탭 줄은 보일 때 선택한 탭으로 스크롤한다.
+  document.querySelectorAll(".folder-tabs").forEach(revealActiveTab);
   toolLinks.forEach((link) => {
     const isActive = link.dataset.tool === tool;
     link.classList.toggle("is-active", isActive);
@@ -532,6 +534,7 @@ function renderTabs() {
   tabs[tabs.length - 1].setAttribute("aria-label", "폴더 추가");
 
   folderTabs.replaceChildren(...tabs);
+  revealActiveTab(folderTabs);
   const folderInput = folderTabs.querySelector(".folder-name-input");
   if (folderInput) {
     folderInput.focus();
@@ -633,6 +636,7 @@ document.addEventListener("drop", () => tabDrag && endTabDrag());
 // 같은 탭 줄 안에서만 옮길 수 있다. 놓으면 onMove(끈 id, 대상 id, 대상 뒤인지)를 부른다.
 function makeTabDraggable(node, container, id, onMove) {
   node.draggable = true;
+  node.dataset.tabId = id;
   node.addEventListener("dragstart", (event) => {
     event.dataTransfer.effectAllowed = "move";
     // 일부 브라우저는 데이터가 없으면 끌기를 시작하지 않는다.
@@ -670,6 +674,38 @@ function makeTabDraggable(node, container, id, onMove) {
     onMove(dragId, id, after);
   });
   node.addEventListener("dragend", endTabDrag);
+}
+
+// 탭 줄은 옆으로 스크롤하므로 마우스 휠의 세로 움직임도 가로 스크롤로 바꾼다.
+document.querySelectorAll(".folder-tabs").forEach((container) => {
+  container.addEventListener(
+    "wheel",
+    (event) => {
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX) || container.scrollWidth <= container.clientWidth) {
+        return;
+      }
+      event.preventDefault();
+      container.scrollLeft += event.deltaY;
+    },
+    { passive: false },
+  );
+});
+
+// 선택한 탭이 바뀌었을 때만 그 탭이 보이게 스크롤한다. 사용자가 옮겨 둔 스크롤을 다시 그릴 때마다 되돌리지 않는다.
+function revealActiveTab(container) {
+  // 숨겨진 화면에서는 스크롤할 수 없으니 보일 때 다시 시도한다.
+  if (!container.offsetParent) {
+    return;
+  }
+  const active = container.querySelector(".folder-tab.is-active");
+  const key = active ? active.dataset.tabId || "all" : "";
+  if (container.dataset.revealed === key) {
+    return;
+  }
+  container.dataset.revealed = key;
+  if (active) {
+    active.scrollIntoView({ block: "nearest", inline: "center" });
+  }
 }
 
 // 옮긴 뒤의 id 순서. 순서가 그대로면 null을 돌려준다.

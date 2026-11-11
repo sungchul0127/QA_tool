@@ -186,6 +186,7 @@ function renderDeployTabs() {
   tabs.push(addButton);
 
   deployTabs.replaceChildren(...tabs);
+  revealActiveTab(deployTabs);
   const nameInput = deployTabs.querySelector(".folder-name-input");
   if (nameInput) {
     nameInput.focus();

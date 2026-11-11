@@ -325,20 +325,28 @@ select:focus {
   border-bottom: 1px solid var(--line);
 }
 
+/* 탭이 많으면 줄을 바꾸지 않고 옆으로 스크롤한다. 스크롤 영역이 헤더 밑줄까지 내려와야 선택 표시선이 잘리지 않는다. */
 .folder-tabs {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   min-width: 0;
+  margin-bottom: -1px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.folder-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 /* 탭은 이름 버튼과 (선택된 폴더일 때) 삭제 버튼을 감싼다. 하단 표시선은 감싸는 쪽에 그린다. */
 .folder-tab {
   display: flex;
   align-items: center;
+  flex: none;
   height: 40px;
-  margin-bottom: -1px;
   border-bottom: 2px solid transparent;
   border-radius: 8px 8px 0 0;
   color: var(--text-muted);
@@ -413,13 +421,18 @@ select:focus {
   font-weight: 500;
 }
 
+/* 스크롤해도 + 버튼은 오른쪽 끝에 남는다. 그림자로 뒤로 지나가는 탭을 가린다. */
 .folder-add-button {
+  position: sticky;
+  right: 0;
+  flex: none;
+  box-shadow: 0 0 0 4px var(--bg), -10px 0 8px -2px var(--bg);
   width: 30px;
   height: 30px;
   margin-left: 2px;
   border: none;
   border-radius: 7px;
-  background: transparent;
+  background: var(--bg);
   color: var(--text-muted);
   font-size: 17px;
   line-height: 1;
@@ -431,6 +444,7 @@ select:focus {
 }
 
 .folder-tabs .folder-name-input {
+  flex: none;
   width: 140px;
   height: 30px;
   margin: 0 4px;

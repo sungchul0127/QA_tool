@@ -256,6 +256,7 @@ function renderManualTabs() {
   tabs.push(addButton);
 
   manualTabs.replaceChildren(...tabs);
+  revealActiveTab(manualTabs);
   const nameInput = manualTabs.querySelector(".folder-name-input");
   if (nameInput) {
     nameInput.placeholder = "매뉴얼 이름 후 Enter";
