@@ -393,6 +393,50 @@ function focusNeighborCell(input, step) {
   }
 }
 
+// 표 안에서 화살표로 옮겨 다닐 수 있는 칸: 글자 칸, 파일 종류 칩, 체크박스
+const DEPLOY_NAV_SELECTOR = ".deploy-input, .deploy-chip, .deploy-check";
+
+// 화살표로 칸을 옮긴다. 위·아래는 늘 옮기고, 글자 칸에서 왼쪽·오른쪽은 커서가 끝에 닿았을 때만 옮긴다.
+function handleDeployArrowKey(event) {
+  if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+    return;
+  }
+  const moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+  const move = moves[event.key];
+  const current = event.target.closest(DEPLOY_NAV_SELECTOR);
+  if (!move || !current) {
+    return;
+  }
+  const [rowStep, colStep] = move;
+  if (colStep && current.classList.contains("deploy-input")) {
+    const { selectionStart, selectionEnd, value } = current;
+    const atEdge = selectionStart === selectionEnd && selectionStart === (colStep < 0 ? 0 : value.length);
+    if (!atEdge) {
+      return;
+    }
+  }
+
+  const rows = [...deployRows.children];
+  const rowIndex = rows.indexOf(current.closest("tr"));
+  const cells = [...rows[rowIndex].querySelectorAll(DEPLOY_NAV_SELECTOR)];
+  const colIndex = cells.indexOf(current);
+  let target;
+  if (rowStep) {
+    const targetRow = rows[rowIndex + rowStep];
+    target = targetRow && targetRow.querySelectorAll(DEPLOY_NAV_SELECTOR)[colIndex];
+  } else {
+    target = cells[colIndex + colStep];
+  }
+  event.preventDefault();
+  if (!target) {
+    return;
+  }
+  target.focus();
+  if (target.classList.contains("deploy-input")) {
+    target.select();
+  }
+}
+
 // 다시 그리지 않고 행의 표시만 고친다. 다른 칸에 입력 중이어도 포커스가 유지된다.
 function refreshRow(id) {
   const item = findItem(id);
@@ -833,6 +877,7 @@ function resetDeploy() {
 /* ---------- 이벤트 ---------- */
 
 deployAddRow.addEventListener("click", addDeployRow);
+deployRows.addEventListener("keydown", handleDeployArrowKey);
 deployDeleteConfirm.addEventListener("click", deleteDeployFolder);
 deployDeleteCancel.addEventListener("click", closeDeployFolderDelete);
 deployDeleteOverlay.addEventListener("mousedown", (event) => {
