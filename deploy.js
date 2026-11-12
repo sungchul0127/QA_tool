@@ -19,6 +19,8 @@ const deployMessage = document.getElementById("deploy-message");
 const deployGrid = document.getElementById("deploy-grid");
 const deployRows = document.getElementById("deploy-rows");
 const deployAddRow = document.getElementById("deploy-add-row");
+const deployTools = document.getElementById("deploy-tools");
+const deploySortDone = document.getElementById("deploy-sort-done");
 const deployDeleteOverlay = document.getElementById("deploy-folder-delete-overlay");
 const deployDeleteHeading = document.getElementById("deploy-folder-delete-heading");
 const deployDeleteBody = document.getElementById("deploy-folder-delete-body");
@@ -242,6 +244,7 @@ function renderDeployBody() {
   deployMessage.textContent = message;
   deployMessage.hidden = !message;
   deployGrid.hidden = Boolean(message);
+  deployTools.hidden = Boolean(message);
 
   if (message) {
     deployProgress.hidden = true;
@@ -674,6 +677,39 @@ async function reorderDeployItem(dragId, targetId) {
   }
 }
 
+// 완료되지 않은 건을 위로, 완료 건을 아래로 모은다. 각 무리 안의 순서는 그대로 둔다.
+async function moveDoneItemsDown() {
+  const folderId = deploy.currentFolder;
+  if (!folderId) {
+    return;
+  }
+  const visible = folderItems(folderId);
+  const ordered = [...visible.filter((item) => !isDone(item)), ...visible.filter(isDone)];
+  if (ordered.every((item, i) => item.id === visible[i].id)) {
+    showToast("이미 정리되어 있습니다");
+    return;
+  }
+  const changes = ordered
+    .map((item, i) => ({ id: item.id, sort_order: i + 1 }))
+    .filter((change, i) => ordered[i].sort_order !== change.sort_order);
+
+  const previous = deploy.items;
+  const newOrders = new Map(changes.map((change) => [change.id, change.sort_order]));
+  deploy.items = sortItems(
+    deploy.items.map((item) => (newOrders.has(item.id) ? { ...item, sort_order: newOrders.get(item.id) } : item)),
+  );
+  renderDeployBody();
+
+  deploySortDone.disabled = true;
+  const results = await Promise.all(changes.map((change) => updateDeployItem(change.id, { sort_order: change.sort_order })));
+  deploySortDone.disabled = false;
+  if (!results.every(Boolean)) {
+    deploy.items = previous;
+    renderDeployBody();
+    showToast(SAVE_ERROR_MESSAGE);
+  }
+}
+
 function sortItems(items) {
   return [...items].sort((a, b) => a.sort_order - b.sort_order);
 }
@@ -878,6 +914,7 @@ function resetDeploy() {
 
 deployAddRow.addEventListener("click", addDeployRow);
 deployRows.addEventListener("keydown", handleDeployArrowKey);
+deploySortDone.addEventListener("click", moveDoneItemsDown);
 deployDeleteConfirm.addEventListener("click", deleteDeployFolder);
 deployDeleteCancel.addEventListener("click", closeDeployFolderDelete);
 deployDeleteOverlay.addEventListener("mousedown", (event) => {
